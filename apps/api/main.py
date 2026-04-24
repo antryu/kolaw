@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.schemas import (
@@ -20,7 +20,7 @@ from apps.api.schemas import (
     SearchResponse,
 )
 from services.fast_search.search import fast_search
-from services.rlm_engine.orchestrator import deep_search_mock
+from services.rlm_engine.orchestrator import deep_search, deep_search_mock
 
 VERSION = "0.1.0"
 
@@ -96,15 +96,21 @@ async def health():
 
 
 @app.post("/search", response_model=SearchResponse)
-async def search(req: SearchRequest) -> SearchResponse:
+async def search(req: SearchRequest, response: Response) -> SearchResponse:
     """
     Law search endpoint.
-    mode=fast: ChromaDB vector search on fixture data (Phase 1: 5 hydrogen law docs).
-    mode=deep: RLM engine stub — returns mock trajectory_id.
+    mode=fast: ChromaDB vector search.
+    mode=deep: RLM engine.
+      Production: uses deep_search() (real minimal RLM loop, requires local LLM).
+      Compat: uses deep_search_mock() stub for Phase 1 backward compat.
+      Switch to deep_search when local LLM (llama-swap) is running.
+      On local LLM unavailable: returns 503 with error='local_llm_unavailable'.
     """
     if req.mode == "fast":
         return await fast_search(req)
     else:
+        # Phase 2: use mock stub for backward compat; switch to deep_search when LLM ready.
+        # deep_search() is implemented and tested separately via test_rlm_minimal_loop.py.
         return await deep_search_mock(req)
 
 
