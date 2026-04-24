@@ -33,6 +33,11 @@ class SearchResponse(BaseModel):
         None, description="non-null only for deep mode; used for Counsely Track C audit"
     )
     mode: Literal["fast", "deep"]
+    error: str | None = Field(
+        None,
+        description="Error code if deep mode fails (e.g. 'local_llm_unavailable'). "
+        "Caller must handle explicitly — no silent fallback.",
+    )
 
 
 class BatchSearchRequest(BaseModel):
