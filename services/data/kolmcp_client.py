@@ -1,78 +1,135 @@
 """
-korean-law-mcp client stub.
+korean-law-mcp client — Phase 2.
 
-Source: github.com/chrisryugj/korean-law-mcp
-MCP server with 64 tools covering:
-  - 법령(statutes): search, detail, article
-  - 판례(case law): constitutional court, supreme court
-  - 행정규칙(administrative rules): ministry circulars
-  - 조례(municipal ordinances): regional regulations
-  - 헌법재판소(Constitutional Court): decisions
-  - 조세심판(tax tribunal): rulings
-  - 관세(customs): tariff schedules
+Source: github.com/chrisryugj/korean-law-mcp (npm: korean-law-mcp@3.5.4)
+MCP server with 16 exposed tools covering:
+  - 법령(statutes): search_law, get_law_text, get_article_detail
+  - 판례(case law): search_decisions, get_decision_text
+  - 인용 검증: verify_citations
+  - 체인 도구: chain_full_research, chain_impact_analysis, etc.
 
-Phase 1: stub only — tools are documented, no live MCP calls.
-Phase 2: wire actual MCP client using the mcp Python SDK.
+Investigation outcome (2026-04-24):
+- Server runs as stdio MCP server (not HTTP by default)
+- Requires 법제처 OC Open API key (OC env var or config)
+- MCP HTTP mode: `korean-law-mcp --http --port <N>` but undocumented
+- Outcome: (b) BLOCKED — OC API key not available in Andrew's env
+  Root cause: 법제처 Open API requires manual registration at open.law.go.kr
+  Scaffolding below connects via HTTP once OC key is available.
+  Action required: Andrew registers at open.law.go.kr → sets OC_API_KEY env var
 
-TODO (Phase 2 — wire these 64 tools):
-  Statutes (법령):
-    - law_search: keyword search across all statutes
-    - law_detail: full text by law_id
-    - law_article: single article by law_id + article_no
-    - law_history: amendment timeline for a law
-    - law_related: find related statutes by xref
+Fallback while blocked: all methods raise KolMCPUnavailable with clear message.
 
-  Case law (판례):
-    - precedent_search: search court decisions
-    - precedent_detail: full decision text
-    - constitutional_search: 헌법재판소 decisions
-    - constitutional_detail: full 헌재 decision
-
-  Administrative rules (행정규칙):
-    - admin_rule_search: search ministry circulars
-    - admin_rule_detail: full circular text
-
-  Municipal ordinances (조례):
-    - ordinance_search: search by region + keyword
-    - ordinance_detail: full ordinance text
-
-  Tax tribunal (조세심판):
-    - tax_tribunal_search: search rulings
-    - tax_tribunal_detail: full ruling text
-
-  Customs (관세):
-    - customs_search: tariff schedule search
-    - customs_detail: specific tariff code detail
-
-  (remaining tools follow same search+detail pattern per domain)
+To unblock:
+  1. Register at https://open.law.go.kr/LSO/openApi/guideList.do
+  2. Set env var: KOLMCP_OC_KEY=<your_key>
+  3. Start server: korean-law-mcp --http --port 3001
+  4. Set env var: KOLMCP_BASE_URL=http://localhost:3001
 """
 
 from __future__ import annotations
 
+import logging
+import os
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+_BASE_URL = os.getenv("KOLMCP_BASE_URL", "http://localhost:3001")
+_OC_KEY = os.getenv("KOLMCP_OC_KEY", "")
+_TIMEOUT = 30.0
+
+
+class KolMCPUnavailable(RuntimeError):
+    """Raised when korean-law-mcp server is not reachable or not configured."""
+
+
+def _check_configured() -> None:
+    """Raise if the MCP server is not configured."""
+    if not _OC_KEY:
+        raise KolMCPUnavailable(
+            "KOLMCP_OC_KEY not set. "
+            "Register at https://open.law.go.kr/LSO/openApi/guideList.do "
+            "then set KOLMCP_OC_KEY=<your_key> and KOLMCP_BASE_URL=http://localhost:3001. "
+            "See services/data/kolmcp_client.py for setup steps."
+        )
+
 
 class KolMCPClient:
     """
-    Stub client for korean-law-mcp MCP server.
+    HTTP client for korean-law-mcp MCP server.
 
-    Phase 1: all methods return NotImplementedError with clear Phase 2 note.
-    Phase 2: replace with actual MCP SDK calls.
+    Phase 2: HTTP mode scaffolding. Requires OC API key + running server.
+    Methods call the MCP server's REST-compatible endpoints.
+
+    Phase 3: Replace with full MCP SDK stdio client for richer tool access.
     """
 
-    def __init__(self, server_url: str = "http://localhost:3001"):
-        self.server_url = server_url
+    def __init__(self, base_url: str = _BASE_URL, oc_key: str = _OC_KEY):
+        self.base_url = base_url.rstrip("/")
+        self.oc_key = oc_key
 
-    def law_search(self, query: str, limit: int = 10) -> list[dict]:
-        raise NotImplementedError(
-            "kolmcp_client.law_search: Phase 2. "
-            "Wire MCP call to korean-law-mcp server at self.server_url."
+    def _headers(self) -> dict[str, str]:
+        return {"Content-Type": "application/json"}
+
+    async def _post(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Send a tool call to the MCP server."""
+        _check_configured()
+        url = f"{self.base_url}/tools/{tool}"
+        payload = {"arguments": args}
+        if self.oc_key:
+            payload["oc"] = self.oc_key
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            try:
+                resp = await client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.ConnectError as exc:
+                raise KolMCPUnavailable(
+                    f"korean-law-mcp server not reachable at {self.base_url}. "
+                    "Start with: korean-law-mcp --http --port 3001"
+                ) from exc
+
+    async def search_law(self, query: str, limit: int = 10) -> list[dict]:
+        """Search statutes via korean-law-mcp search_law tool."""
+        result = await self._post("search_law", {"query": query, "display": limit})
+        return result.get("results", [])
+
+    async def get_law_text(self, law_id: str) -> dict:
+        """Get full statute text via get_law_text tool."""
+        return await self._post("get_law_text", {"law_id": law_id})
+
+    async def search_decisions(
+        self, query: str, domain: str = "precedent", limit: int = 10
+    ) -> list[dict]:
+        """Search case law (판례) via search_decisions tool."""
+        result = await self._post(
+            "search_decisions", {"query": query, "domain": domain, "display": limit}
+        )
+        return result.get("results", [])
+
+    async def get_decision_text(self, decision_id: str, domain: str = "precedent") -> dict:
+        """Get full decision text via get_decision_text tool."""
+        return await self._post(
+            "get_decision_text", {"id": decision_id, "domain": domain}
         )
 
-    def precedent_search(self, query: str, court: str = "all", limit: int = 10) -> list[dict]:
-        raise NotImplementedError(
-            "kolmcp_client.precedent_search: Phase 2."
-        )
+    async def verify_citations(self, text: str) -> dict:
+        """Verify law citations in text against 법제처 DB."""
+        return await self._post("verify_citations", {"text": text})
 
-    def constitutional_search(self, query: str, limit: int = 10) -> list[dict]:
-        raise NotImplementedError(
-            "kolmcp_client.constitutional_search: Phase 2."
-        )
+    async def chain_full_research(self, query: str) -> dict:
+        """Run chain_full_research for comprehensive legal analysis."""
+        return await self._post("chain_full_research", {"query": query})
+
+    async def is_available(self) -> bool:
+        """Check if MCP server is reachable (health probe)."""
+        if not self.oc_key:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{self.base_url}/health")
+                return resp.status_code == 200
+        except Exception:
+            return False
