@@ -7,6 +7,32 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.124+-009688.svg)](https://fastapi.tiangolo.com)
 
+---
+
+## 🇰🇷 한국어 안내
+
+**kolaw** 는 한국 법령 검색을 한 곳에 모은 오픈소스 백엔드입니다.
+
+- **legalize-kr** (오프라인 git repo, 2,300+ 법령) + **법제처 Open API** (실시간 판례·해석·행정규칙·조례) 를 단일 `/search` HTTP 엔드포인트로 통합
+- 키워드 검색은 다중키워드 **AND/OR** 지원 — `의료 규제` (AND) / `의료 OR 외국인` / `의료 \| 외국인` / `의료 또는 외국인` (OR)
+- chrisryugj/korean-law-mcp · SeoNaRu/lexguard-mcp 같은 기존 MCP 서버는 **선택적 통합** (필요할 때만)
+- **LLM 기반 자율 검색 (RLM)** 은 옵션 — 로컬 Qwen3-32B 같은 OpenAI 호환 엔드포인트를 사용
+
+### 본인이 직접 준비해야 하는 것
+
+| 항목 | 용도 | 소요 시간 |
+|---|---|---|
+| **OC 등록** at <https://open.law.go.kr> | 법제처 Open API 호출 — 6개 source 즉시 활성화 (법령/판례/해석/행심/행정규칙/조례) | 회원가입 + 프로젝트명 등록 ~5분 (즉시 승인) |
+| **헌법재판소 결정 추가 신청** | 7번째 source `detc` (헌재 결정) 활성화 | 신청관리 → 사용중지/추가신청 → 헌법재판소 결정 체크 → 약 1일 승인 대기 |
+| **legalize-kr 로컬 클론** | 오프라인 법령 본문 + 개정 이력 (git log) | `git clone github.com/9bow/legalize-kr` ~3분 |
+| (옵션) **로컬 LLM** | Deep 모드 (RLM 엔진) — Fast 모드는 LLM 없이 작동 | llama.cpp / Ollama / llama-swap 등 |
+
+⚠️ **`OC` 값은 비밀 키가 아니라 본인이 정한 프로젝트 이름** (사용자명처럼 다루세요). 코드 안에 baked-in된 키 없음 — 본인이 직접 등록해서 `LAW_GO_KR_OC` 환경변수에 넣으세요.
+
+영문 안내는 아래 ↓
+
+---
+
 ## Why kolaw?
 
 Korean law tooling has matured rapidly — multiple excellent MCP servers exist
@@ -65,6 +91,43 @@ Korean law tooling has matured rapidly — multiple excellent MCP servers exist
 - **Fast** (default): legalize-kr grep + law.go.kr live merge → typically <2s, no LLM cost
 - **Deep**: RLM Engine — local LLM writes Python in REPL, calls grep + law.go.kr as tools,
   emits `FINAL_ANSWER`. Requires `LOCAL_LLM_BASE_URL`. Experimental.
+
+## Prerequisites — what you need to bring yourself
+
+kolaw is a thin aggregator. It wraps services that **require your own
+registration / setup**. Nothing here is shipped with credentials baked in.
+
+### Required for live data
+
+| You provide | What for | How long | Where |
+|-------------|----------|----------|-------|
+| **`LAW_GO_KR_OC`** — a project name registered at open.law.go.kr | Unlocks 6 of 7 live sources: 법령 / 판례 / 법령해석례 / 행정심판 / 행정규칙 / 자치법규 | ~5 min to register; instant approval | <https://open.law.go.kr/LSO/openApi/guideList.do> |
+| `legalize-kr` repo cloned locally | Offline 2,300+ statute corpus + git revision history | ~3 min | `git clone github.com/9bow/legalize-kr` |
+
+The `OC` value is **not a secret** — it's the project name you chose on
+open.law.go.kr (treat it like a username). All this repo's code paths
+that hit law.go.kr fail with a clear "OC not configured" message until
+you set it.
+
+### Required for specific sources / modes
+
+| You provide | Unlocks | Cost | Note |
+|-------------|---------|------|------|
+| **헌법재판소 결정 추가 권한** at open.law.go.kr | The 7th live source: `detc` (헌재 결정) | Free, ~1 day approval | Login → 신청관리 → 사용중지/추가신청 → check 헌법재판소 결정 → submit |
+| Self-hosted `korean-law-mcp` (chrisryugj) | `verify_citations` (citation hallucination check), `chain_full_research` | Free, ~5 min | `npm i -g korean-law-mcp` then `LAW_OC=$LAW_GO_KR_OC korean-law-mcp --mode http --port 3001` |
+| Self-hosted `lexguard-mcp` (SeoNaRu) | Reranker, 13-domain classifier, contract analyzer (18 tools / 159 APIs) | Free, ~10 min | `git clone github.com/SeoNaRu/lexguard-mcp && LAW_API_KEY=$LAW_GO_KR_OC docker compose up` |
+| Local LLM (e.g. Qwen3-32B via llama.cpp) | Deep mode — RLM Engine | Free, ~30 min download | Any OpenAI-compatible endpoint at `LOCAL_LLM_BASE_URL` |
+| Anthropic API key | Deep mode fallback when local LLM is down | Paid | `ALLOW_ANTHROPIC=1` + `ANTHROPIC_API_KEY=...` (off by default; gated) |
+
+### Not required (works without)
+
+- Supabase / database — kolaw is stateless; nothing is persisted server-side
+- ChromaDB / vector index — currently not used (keyword + live API combo
+  handles the workload). The deps remain in `pyproject.toml` for the optional
+  Phase-4 path, but no vectors are built or queried by default.
+
+> **TL;DR — bare minimum to get useful answers:** register an `OC` at
+> open.law.go.kr (5 minutes) + clone legalize-kr. Everything else is opt-in.
 
 ## Quick Start
 
