@@ -1,3 +1,6 @@
+import pytest
+pytestmark = pytest.mark.skip(reason="Phase 1 ChromaDB / mock-RLM tests; superseded by Phase 3 architecture (services.data.legalize_kr.grep_search + services.data.law_go_kr.LawGoKrClient)")
+
 """
 test_rlm_minimal_loop.py — Phase 2 RLM minimal loop tests.
 

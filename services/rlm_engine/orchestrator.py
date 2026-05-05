@@ -104,23 +104,28 @@ async def run(
                 law_texts[tree.law_name] = combined
         log.steps.append({"step": "law_load", "count": len(law_texts), "source": "caller"})
     else:
-        # Pre-filter via fast_search ChromaDB
+        # Pre-filter via grep_search over legalize-kr (Phase 3 — replaces ChromaDB).
+        # Loads the matching laws' first-N articles into the REPL session so the
+        # LLM has real corpus text to work from.
         try:
-            from services.fast_search.search import _get_collection
+            from services.data.legalize_kr import grep_search, load_law
 
-            collection = _get_collection()
-            results = collection.query(query_texts=[query], n_results=10)
-            metas = results.get("metadatas", [[]])[0]
-            docs = results.get("documents", [[]])[0]
-            for meta, doc in zip(metas, docs):
-                name = meta.get("law_name", "unknown") if meta else "unknown"
-                if name not in law_texts:
-                    law_texts[name] = doc
+            grep_result = await grep_search(query, limit=8)
+            for hit in grep_result.hits:
+                tree = load_law(hit.law_name)
+                if not tree or hit.law_name in law_texts:
+                    continue
+                combined = "\n".join(
+                    f"{a.number}{a.title}: {a.content[:500]}"
+                    for a in tree.articles[:20]
+                )
+                law_texts[hit.law_name] = combined
             log.steps.append(
-                {"step": "law_prefilter", "count": len(law_texts), "source": "fast_search"}
+                {"step": "law_prefilter", "count": len(law_texts),
+                 "source": "grep_search", "mode": grep_result.mode}
             )
         except Exception as exc:
-            logger.warning("fast_search prefilter failed: %s", exc)
+            logger.warning("grep_search prefilter failed: %s", exc)
             log.steps.append({"step": "law_prefilter", "error": str(exc)})
 
     # Step 2: set up REPL session

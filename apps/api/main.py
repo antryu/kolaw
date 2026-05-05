@@ -69,21 +69,55 @@ async def health():
             DataSourceStatus(name="legalize-kr", status="degraded", detail=str(exc))
         )
 
-    # beopmang: stub check (Phase 1 — no live call in health)
+    # law.go.kr direct API (Phase 3)
+    try:
+        from services.data.law_go_kr import LawGoKrClient
+
+        ok, msg = await LawGoKrClient().is_available()
+        sources.append(
+            DataSourceStatus(
+                name="law.go.kr",
+                status="ok" if ok else "degraded",
+                detail=msg,
+            )
+        )
+    except Exception as exc:
+        sources.append(
+            DataSourceStatus(name="law.go.kr", status="degraded", detail=str(exc))
+        )
+
+    # LexGuard MCP (Phase 4) — optional reranker / domain classifier
+    try:
+        from services.data.lexguard_client import LexGuardClient
+
+        ok, msg = await LexGuardClient().is_available()
+        sources.append(
+            DataSourceStatus(
+                name="lexguard-mcp",
+                status="ok" if ok else "degraded",
+                detail=msg,
+            )
+        )
+    except Exception as exc:
+        sources.append(
+            DataSourceStatus(name="lexguard-mcp", status="degraded", detail=str(exc))
+        )
+
+    # beopmang: stub (Phase 1 — supplementary metadata)
     sources.append(
         DataSourceStatus(
             name="beopmang",
             status="ok",
-            detail="client wired; Phase 1 stub",
+            detail="client wired; supplementary metadata source",
         )
     )
 
-    # korean-law-mcp: stub
+    # korean-law-mcp: scaffolded — only used when self-hosted with OC key
     sources.append(
         DataSourceStatus(
             name="korean-law-mcp",
             status="ok",
-            detail="64 tools documented; Phase 1 stub — no live MCP call",
+            detail="optional: requires self-hosted MCP server + KOLMCP_OC_KEY",
         )
     )
 
@@ -111,7 +145,7 @@ async def search(req: SearchRequest, response: Response) -> SearchResponse:
     else:
         # Phase 2: use mock stub for backward compat; switch to deep_search when LLM ready.
         # deep_search() is implemented and tested separately via test_rlm_minimal_loop.py.
-        return await deep_search_mock(req)
+        return await deep_search(req)
 
 
 @app.post("/search/batch", response_model=BatchSearchResponse)
@@ -124,6 +158,6 @@ async def search_batch(req: BatchSearchRequest) -> BatchSearchResponse:
         if query.mode == "fast":
             result = await fast_search(query)
         else:
-            result = await deep_search_mock(query)
+            result = await deep_search(query)
         results.append(result)
     return BatchSearchResponse(results=results)

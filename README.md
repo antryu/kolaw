@@ -13,51 +13,58 @@ Korean law tooling has matured rapidly — multiple excellent MCP servers exist
 ([korean-law-mcp][chrisryugj], [LexGuard][lexguard]) — each with its own strengths.
 **kolaw doesn't replace them. It unifies them.**
 
-- **Offline statute corpus** via [legalize-kr][legalize-kr] (MIT) — 2,303 laws as markdown,
+- **Offline statute corpus** via [legalize-kr][legalize-kr] (MIT) — 2,300+ laws as markdown,
   works without an API key, with full **revision history via `git log`** ("what did this
   law say in 2020?").
-- **Live case law & interpretations** via the Korean MCP ecosystem
-  (chrisryugj, LexGuard) — real-time 판례·해석·헌재결정.
-- **Vector search (ChromaDB)** + **LLM-driven autonomous search (RLM)** for queries that
-  pure keyword search can't handle.
-- **One JSON API** (`POST /search`) abstracts all of it. Switch sources with config.
+- **Live 판례·해석·행정규칙·조례** via [law.go.kr Open API][lawgokr-open] — direct calls,
+  no MCP indirection. Just register a project name (the `OC` value).
+- **Multi-source unified search** — `/search` runs offline grep + live API in parallel,
+  returns merged citations.
+- **Multi-keyword AND/OR** — `"의료 규제"` (AND) or `"의료 OR 외국인"` / `"의료 \| 외국인"` /
+  `"의료 또는 외국인"` (OR). All shorthand recognized.
+- **LLM-driven autonomous search (RLM)** for queries pure keyword search can't handle —
+  experimental, requires local LLM.
 
 ## Architecture
 
 ```
-                ┌──────────────────────────────────┐
-                │         antryu/kolaw              │
-                │      FastAPI on :8100             │
-                └──────────────────────────────────┘
-                                │
-       ┌────────────────────────┼────────────────────────┐
-       ▼                        ▼                        ▼
-┌──────────────┐       ┌─────────────────┐     ┌────────────────────┐
-│ legalize-kr  │       │ korean-law-mcp  │     │ lexguard-mcp       │
-│ 2,303 laws   │       │ chrisryugj      │     │ SeoNaRu            │
-│ MIT, offline │       │ 16 tools / 41   │     │ 18 tools / 159     │
-│ git history  │       │ APIs, citation  │     │ APIs, reranker     │
-│              │       │ verification    │     │ + domain classify  │
-└──────────────┘       └─────────────────┘     └────────────────────┘
-       │                        │                        │
-       └────────────────────────┴────────────────────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │  ChromaDB (vector search)     │
-                │  RLM Engine (LLM autonomous)  │
-                └───────────────────────────────┘
+              ┌──────────────────────────────────────┐
+              │           antryu/kolaw                │
+              │      FastAPI on :8100                 │
+              │  /search  /search/batch  /health      │
+              └──────────────────────────────────────┘
+                              │
+   ┌──────────────────┬───────┴────────┬─────────────────────┐
+   ▼                  ▼                ▼                     ▼
+┌──────────────┐  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐
+│ legalize-kr  │  │ law.go.kr   │  │ lexguard-mcp │  │ korean-law-mcp   │
+│ git grep     │  │ Open API    │  │ (optional,   │  │ (optional,       │
+│ 2,300+ laws  │  │ 판례·해석·   │  │ self-host)   │  │ self-host)       │
+│ AND/OR       │  │ 행정규칙·조례 │  │ reranker +   │  │ 64 tools,        │
+│ + 개정 이력  │  │ 6 sources    │  │ contract     │  │ citation verif.  │
+│ MIT, offline │  │ OC=YourName  │  │ analysis     │  │                  │
+└──────────────┘  └─────────────┘  └──────────────┘  └──────────────────┘
+        │                │                │                     │
+        └────────────────┴────────────────┴─────────────────────┘
+                              │
+                  ┌───────────┴───────────┐
+                  │ Fast path (default)   │  legalize-kr grep + law.go.kr merge
+                  │ Deep path (RLM)       │  Qwen3 / Claude → REPL → citations
+                  └───────────────────────┘
 ```
 
-| Source | Type | License | Status |
-|--------|------|---------|--------|
-| [9bow/legalize-kr][legalize-kr] | 2,303 statutes (Markdown + git) | MIT | Phase 1 ✅ |
-| [api.beopmang.org][beopmang] | Structured metadata (article/case counts) | — | Phase 1 ✅ |
-| [chrisryugj/korean-law-mcp][chrisryugj] | 16 MCP tools / 41 법제처 APIs | — | Phase 2 🔧 |
-| [SeoNaRu/lexguard-mcp][lexguard] | 18 MCP tools / 159 APIs | MIT | Phase 3 📋 |
+| Source | Coverage | License | Status |
+|--------|----------|---------|--------|
+| [9bow/legalize-kr][legalize-kr] | 2,300+ 법률·시행령·시행규칙 (offline + git history) | MIT | ✅ live |
+| [law.go.kr Open API][lawgokr-open] | 법령 + 판례 + 법령해석례 + 행정심판 + 행정규칙 + 조례 | data.go.kr | ✅ live |
+| [api.beopmang.org][beopmang] | Structured metadata (article/case counts) | — | ✅ wired |
+| [SeoNaRu/lexguard-mcp][lexguard] | 18 MCP tools / 159 APIs (reranker, contract analyzer) | MIT | 🧩 optional |
+| [chrisryugj/korean-law-mcp][chrisryugj] | 16 MCP tools / 41 APIs (citation verification) | — | 🧩 optional |
 
 **Two search paths:**
-- **Fast** (~90% of queries): ChromaDB vector search over indexed corpus + direct grep
-- **Deep** (~10%): RLM Engine — LLM writes search code, REPL executes, captures `FINAL_ANSWER`
+- **Fast** (default): legalize-kr grep + law.go.kr live merge → typically <2s, no LLM cost
+- **Deep**: RLM Engine — local LLM writes Python in REPL, calls grep + law.go.kr as tools,
+  emits `FINAL_ANSWER`. Requires `LOCAL_LLM_BASE_URL`. Experimental.
 
 ## Quick Start
 
