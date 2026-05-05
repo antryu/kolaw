@@ -112,14 +112,22 @@ async def health():
         )
     )
 
-    # korean-law-mcp: scaffolded — only used when self-hosted with OC key
-    sources.append(
-        DataSourceStatus(
-            name="korean-law-mcp",
-            status="ok",
-            detail="optional: requires self-hosted MCP server + KOLMCP_OC_KEY",
+    # korean-law-mcp (chrisryugj) — optional self-hosted MCP. Probe live.
+    try:
+        from services.data.kolmcp_client import KolMCPClient
+
+        ok, msg = await KolMCPClient().is_available()
+        sources.append(
+            DataSourceStatus(
+                name="korean-law-mcp",
+                status="ok" if ok else "degraded",
+                detail=msg,
+            )
         )
-    )
+    except Exception as exc:
+        sources.append(
+            DataSourceStatus(name="korean-law-mcp", status="degraded", detail=str(exc))
+        )
 
     overall = (
         "ok"

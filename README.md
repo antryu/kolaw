@@ -119,30 +119,64 @@ See [`docs/API.md`](docs/API.md) for the full specification.
 Copy `.env.example` to `.env` and set values:
 
 ```bash
-# LLM (primary: local Qwen3-32B via llama.cpp / llama-swap)
+# law.go.kr Open API — register a project name at open.law.go.kr,
+# then use that name as the OC value. NOT a secret.
+LAW_GO_KR_OC=YourRegisteredProjectName
+
+# legalize-kr corpus mount (clone github.com/9bow/legalize-kr)
+LEGALIZE_KR_PATH=/data/legalize-kr
+
+# LLM (primary: local Qwen3-32B via llama.cpp / llama-swap; Deep mode only)
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8080/v1
 LOCAL_LLM_MODEL=qwen3:32b
 
 # Optional Anthropic fallback (gated)
 ALLOW_ANTHROPIC=0
 
-# Data sources
-LEGALIZE_KR_PATH=/data/legalize-kr   # mount your local clone of 9bow/legalize-kr
+# Optional supplementary metadata
 BEOPMANG_BASE_URL=https://api.beopmang.org/api/v4
 
-# ChromaDB
-CHROMA_HOST=chromadb
-CHROMA_PORT=8000
+# Optional MCP integrations
+# LEXGUARD_BASE_URL=http://localhost:9099/mcp   # self-hosted lexguard-mcp
+# KOLMCP_BASE_URL=http://localhost:3001         # self-hosted korean-law-mcp
 ```
+
+> **헌법재판소 결정 (`detc`)** is gated behind a separate API permission at
+> open.law.go.kr — a bare OC registration returns an empty schema-only
+> response for that target. To enable it, log in at open.law.go.kr →
+> 신청관리 → 사용중지/추가신청 → check 헌법재판소 결정 → submit. Approval
+> typically takes 1 business day. See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+> for the full procedure. The five other live sources (법령·판례·해석·행심·
+> 행정규칙·자치법규) work out of the box with any registered OC.
 
 ## Roadmap
 
-- [x] **Phase 1** — legalize-kr local search, beopmang client, FastAPI scaffold, RLM stub
-- [ ] **Phase 2** — chrisryugj/korean-law-mcp integration (판례·해석)
-- [ ] **Phase 3** — LexGuard MCP integration (159 APIs, reranker, contract analysis)
-- [ ] **Phase 4** — Full ChromaDB index of 2,303 statutes (sentence-transformers)
-- [ ] **Phase 5** — RLM Engine production hardening (RestrictedPython / Docker sandbox)
-- [ ] **Phase 6** — MCP server wrapper (so kolaw itself can be consumed via MCP)
+**Done**
+- [x] legalize-kr local loader (article parsing, frontmatter, git history)
+- [x] Multi-keyword **AND / OR** keyword search via `git grep` (`OR` / `|` / `또는`)
+- [x] **law.go.kr Open API direct client** — 6 sources: 법령 / 판례 / 법령해석례 /
+  행정심판 재결 / 행정규칙 / 자치법규 (조례). Single `OC` parameter unlocks all.
+- [x] `/search` merges legalize-kr grep + law.go.kr live results in parallel,
+  dedupes by (law_name, article)
+- [x] `/health` surfaces every data source's reachability + config status
+- [x] LexGuard MCP JSON-RPC client (typed wrappers; ready for self-host)
+- [x] beopmang client (metadata enrichment)
+- [x] RLM minimal loop on top of grep-based prefilter (no ChromaDB dependency)
+- [x] Test suite: 34 passing
+
+**Pending**
+- [ ] 헌법재판소 결정 (`detc`) — needs separate API permission registration at
+  open.law.go.kr beyond the base `OC` value
+- [ ] chrisryugj/korean-law-mcp self-host wiring (client scaffolded; needs the
+  caller to run the MCP server locally with their own OC key)
+- [ ] LexGuard self-host integration tests (hosted endpoint returns empty
+  results because its upstream OC key is missing)
+- [ ] Optional ChromaDB vector index (`sentence-transformers`) — deferred; the
+  current keyword + live-API combo handles most queries without it
+- [ ] RLM production hardening — multi-turn retries when the LLM emits
+  syntactically broken Python; `RestrictedPython` / Docker sandbox for the REPL
+- [ ] kolaw-as-MCP-server wrapper — expose `/search` as an MCP tool so Claude
+  Desktop / Cursor can consume kolaw directly
 
 ## Contributing
 

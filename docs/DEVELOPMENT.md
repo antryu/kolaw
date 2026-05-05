@@ -68,18 +68,60 @@ degrading.
 - API responses wrap data in `{"data": {...}}` envelopes inconsistently —
   the client normalizes.
 
-### chrisryugj/korean-law-mcp (Phase 2)
-- HTTP client scaffold exists in `services/data/kolmcp_client.py`.
-- Provides 16 MCP tools backed by 41 법제처 OpenAPIs, with
-  citation-hallucination cross-validation.
-- Plan: surface as a sub-source the API layer queries when the user asks for
-  판례 / 행정규칙 / 헌재결정.
+### law.go.kr Open API (primary live source)
+- Direct calls to `https://www.law.go.kr/DRF/lawSearch.do` via
+  `services/data/law_go_kr.py`. No MCP indirection.
+- Single `OC` query parameter is the project-name you registered at
+  open.law.go.kr — **not a secret**, treat like a username.
+- Six target codes work out of the box with any registered OC:
+  `law / prec / expc / decc / admrul / ordin`.
+- One target needs separate permission (see below): `detc` (헌재 결정).
 
-### SeoNaRu/lexguard-mcp (Phase 3)
-- 18 MCP tools, 159 APIs, BM25+keyword reranker, 13-domain auto-classifier.
-- Hosted endpoint: `https://lexguard-mcp.onrender.com/mcp` (also self-hostable).
-- Plan: integrate alongside chrisryugj — they overlap but each has unique
-  strengths (LexGuard reranker + contract analysis; chrisryugj citation guard).
+#### Enabling 헌법재판소 결정 (detc)
+A bare OC subscription does not include 헌재 결정 — open.law.go.kr returns a
+schema-only stub for `target=detc` until you explicitly opt in. Steps:
+
+1. Log in at <https://open.law.go.kr>.
+2. Navigate to **신청관리 → 사용중지/추가신청** (top-right user menu).
+3. Find your registered project, click **추가신청**.
+4. Check **헌법재판소 결정** in the data-source list and submit.
+5. Wait for approval (typically 1 business day; you'll get an email).
+6. Re-run `LawGoKrClient().search_constitutional("...")` — it should now
+   return populated `detc` arrays.
+
+The `services/data/law_go_kr.py` client already maps the response shape
+correctly; no code change is needed once the permission lands.
+
+### chrisryugj/korean-law-mcp (optional)
+- Wraps 16 of the 41 법제처 APIs as MCP tools, plus its headline
+  `verify_citations` (LLM hallucination check) and chain orchestration tools.
+- We hit the underlying APIs directly via `law_go_kr`, so the only reason to
+  also run chrisryugj is its **verify_citations** and **chain_full_research**
+  tools — those do reasoning the raw OpenAPI doesn't.
+- Setup (5 minutes once you have an OC):
+  ```bash
+  npm install -g korean-law-mcp
+  LAW_OC=$LAW_GO_KR_OC korean-law-mcp --http --port 3001 &
+  ```
+- `services/data/kolmcp_client.py` reuses `LAW_GO_KR_OC` automatically;
+  override with `KOLMCP_OC` only if you want a separate identity.
+- The client tries JSON-RPC 2.0 (`/mcp`) first, falls back to the legacy
+  REST-style `/tools/<name>` shape if the server fork uses that.
+
+### SeoNaRu/lexguard-mcp (optional)
+- 18 MCP tools / 159 APIs / BM25+keyword reranker / 13-domain auto-classifier
+  / contract analyzer.
+- Hosted endpoint at `https://lexguard-mcp.onrender.com/mcp` is reachable but
+  its upstream OC is missing, so it returns empty results. Self-host for real
+  data:
+  ```bash
+  git clone https://github.com/SeoNaRu/lexguard-mcp
+  LAW_API_KEY=$LAW_GO_KR_OC docker compose up --build
+  # MCP endpoint at http://localhost:9099/mcp
+  export LEXGUARD_BASE_URL=http://localhost:9099/mcp
+  ```
+- The `services/data/lexguard_client.py` JSON-RPC client handles both the
+  hosted endpoint (for sniff tests) and a self-host (for real data).
 
 ## RLM Engine
 

@@ -15,9 +15,16 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Local corpus path — override with LEGALIZE_KR_PATH env var
+# Local corpus path — override with LEGALIZE_KR_PATH env var.
+# Accept both the repo root (.../legalize-kr) and the kr/ subdir
+# (.../legalize-kr/kr); auto-append "kr" if the configured path looks
+# like the repo root. Matches how most users `git clone` the project.
 _DEFAULT_PATH = Path(os.path.expanduser("~/Thairon/legalize-kr/kr"))
-_CORPUS_PATH = Path(os.getenv("LEGALIZE_KR_PATH", str(_DEFAULT_PATH)))
+_RAW_PATH = Path(os.getenv("LEGALIZE_KR_PATH", str(_DEFAULT_PATH)))
+if _RAW_PATH.name != "kr" and (_RAW_PATH / "kr").is_dir():
+    _CORPUS_PATH = _RAW_PATH / "kr"
+else:
+    _CORPUS_PATH = _RAW_PATH
 
 # Regex: matches 제N조, 제N조의M, 제N조(title) patterns in Korean law Markdown
 _ARTICLE_RE = re.compile(r"^#{1,6}\s*(제\d+조(?:의\d+)?(?:\s*\([^)]+\))?)", re.MULTILINE)
