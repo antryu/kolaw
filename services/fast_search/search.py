@@ -18,6 +18,12 @@ import os
 import re
 
 from apps.api.schemas import Citation, SearchRequest, SearchResponse
+from services.data.data_go_kr_court import (
+    CourtPrecedent,
+    DataGoKrCourtClient,
+    DataGoKrCourtUnavailable,
+    is_constitution_query,
+)
 from services.data.law_go_kr import LawGoKrClient, LawGoKrItem, LawGoKrUnavailable
 from services.data.legalize_kr import GrepHit, grep_search
 
@@ -68,6 +74,51 @@ def _law_go_kr_to_citation(item: LawGoKrItem) -> Citation:
         version=item.enforced_at.replace(".", "").replace("-", ""),
         excerpt=excerpt[:400],
     )
+
+
+def _court_to_citation(p: CourtPrecedent) -> Citation:
+    """Convert a 헌법재판소 decision row to a Citation."""
+    excerpt_bits = [p.class_nm or "헌법재판소 결정", p.adjudge_dt or ""]
+    return Citation(
+        law_id=p.event_no or p.seq,
+        law_name=p.nick or p.title or p.event_no,
+        article="헌재결정",
+        version=(p.adjudge_dt or "").replace(".", "").replace("-", ""),
+        excerpt=" · ".join(b for b in excerpt_bits if b)[:400],
+    )
+
+
+async def _data_go_kr_court_enrichment(query: str) -> list[Citation]:
+    """
+    Optional 헌재 enrichment via data.go.kr.
+
+    Only runs when the query mentions a constitution-related keyword
+    (헌법, 헌재, 위헌, 합헌, 기본권, 탄핵, etc.) to conserve the 1000/day
+    rate limit. Returns [] if the API is not configured or fails.
+    """
+    if not is_constitution_query(query):
+        return []
+    if not os.getenv("DATA_GO_KR_KEY"):
+        return []
+
+    # eventNm filter is a literal substring match against the case nickname,
+    # so multi-word queries rarely hit. Strip constitution-marker words and
+    # try the remaining first keyword. Fall back to no filter if nothing left.
+    _STOPWORDS = {"헌법", "헌재", "위헌", "합헌", "헌법불합치", "한정합헌",
+                  "한정위헌", "헌법소원", "기본권", "탄핵", "정당해산", "권한쟁의"}
+    keywords = [w for w in (query or "").split() if w and w not in _STOPWORDS]
+    refined = keywords[0] if keywords else None
+
+    try:
+        client = DataGoKrCourtClient()
+        items = await client.search_realm(query=refined, category=0, per_page=5)
+    except DataGoKrCourtUnavailable as exc:
+        logger.warning("data.go.kr 헌재 enrichment skipped: %s", exc)
+        return []
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("data.go.kr 헌재 enrichment exception: %s", exc)
+        return []
+    return [_court_to_citation(p) for p in items]
 
 
 async def _law_go_kr_enrichment(query: str) -> list[Citation]:
@@ -149,8 +200,11 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
         )
 
     grep_citations = [_grep_to_citation(h) for h in result.hits]
-    law_go_kr_citations = await _law_go_kr_enrichment(req.query)
-    citations = _dedupe_citations(grep_citations + law_go_kr_citations)
+    law_go_kr_citations, court_citations = await asyncio.gather(
+        _law_go_kr_enrichment(req.query),
+        _data_go_kr_court_enrichment(req.query),
+    )
+    citations = _dedupe_citations(grep_citations + law_go_kr_citations + court_citations)
     confidence = _confidence_from_hits(len(citations), result.mode)
 
     if confidence >= 0.7:

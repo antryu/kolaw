@@ -23,7 +23,7 @@
 | 항목 | 용도 | 소요 시간 |
 |---|---|---|
 | **OC 등록** at <https://open.law.go.kr> | 법제처 Open API 호출 — 6개 source 즉시 활성화 (법령/판례/해석/행심/행정규칙/조례) | 회원가입 + 프로젝트명 등록 ~5분 (즉시 승인) |
-| **헌법재판소 결정 추가 신청** | 7번째 source `detc` (헌재 결정) 활성화 | 신청관리 → 사용중지/추가신청 → 헌법재판소 결정 체크 → 약 1일 승인 대기 |
+| **헌법재판소 결정 — `DATA_GO_KR_KEY`** | data.go.kr의 별도 헌재 판례 API (1000회/일/엔드포인트) — 자동승인, 즉시 사용 가능 | <https://www.data.go.kr/data/15123093/openapi.do> 에서 활용신청 → 발급된 Decoding 키를 `DATA_GO_KR_KEY=`에 넣음 (~5분) |
 | **legalize-kr 로컬 클론** *(권장, 필수는 아님)* | 오프라인 법령 본문 + 개정 이력 (git log). 안 받아도 OC 등록되어 있으면 live API로 작동 | `git clone github.com/9bow/legalize-kr` ~3분 |
 | (옵션) **LLM 엔드포인트** (로컬 OR Anthropic API 중 택1) | Deep 모드 (RLM 엔진) 전용 — Fast 모드는 LLM 없이 작동 | 로컬: llama.cpp / Ollama / llama-swap (무료) · 또는 `ANTHROPIC_API_KEY` + `ALLOW_ANTHROPIC=1` (유료) |
 
@@ -116,6 +116,7 @@ kolaw는 **두 가지를 동시에 사용**합니다:
 | [9bow/legalize-kr][legalize-kr] | 2,300+ 법률·시행령·시행규칙 (offline + git history) | MIT | ✅ live |
 | [law.go.kr Open API][lawgokr-open] | 법령 + 판례 + 법령해석례 + 행정심판 + 행정규칙 + 조례 | data.go.kr | ✅ live |
 | [api.beopmang.org][beopmang] | Structured metadata (article/case counts) | — | ✅ wired |
+| [data.go.kr 헌법재판소 판례][datagokr-court] | 헌재 결정문 (분야별 주요판례 + 공보) | data.go.kr | ✅ live (when `DATA_GO_KR_KEY` set) |
 | [SeoNaRu/lexguard-mcp][lexguard] | 18 MCP tools / 159 APIs (reranker, contract analyzer) | MIT | 🧩 optional |
 | [chrisryugj/korean-law-mcp][chrisryugj] | 16 MCP tools / 41 APIs (citation verification) | — | 🧩 optional |
 
@@ -147,7 +148,8 @@ you set it.
 
 | You provide | Unlocks | Cost | Note |
 |-------------|---------|------|------|
-| **헌법재판소 결정 추가 권한** at open.law.go.kr | The 7th live source: `detc` (헌재 결정) | Free, ~1 day approval | Login → 신청관리 → 사용중지/추가신청 → check 헌법재판소 결정 → submit |
+| **`DATA_GO_KR_KEY`** — separate serviceKey from data.go.kr (recommended over the law.go.kr `detc` route) | 헌재 결정문 lookup via /getRealmMainPrcdntList. 1000 req/day per endpoint. Auto-routed in /search when the query mentions 헌법 / 헌재 / 위헌 / 합헌 / 기본권 / 탄핵 etc. | Free, auto-approved on the spot | <https://www.data.go.kr/data/15123093/openapi.do> → 활용신청 |
+| ~~law.go.kr 헌재 추가 권한~~ (legacy path, no longer needed) | covered by `DATA_GO_KR_KEY` above | — | superseded |
 | Self-hosted `korean-law-mcp` (chrisryugj) | `verify_citations` (citation hallucination check), `chain_full_research` | Free, ~5 min | `npm i -g korean-law-mcp` then `LAW_OC=$LAW_GO_KR_OC korean-law-mcp --mode http --port 3001` |
 | Self-hosted `lexguard-mcp` (SeoNaRu) | Reranker, 13-domain classifier, contract analyzer (18 tools / 159 APIs) | Free, ~10 min | `git clone github.com/SeoNaRu/lexguard-mcp && LAW_API_KEY=$LAW_GO_KR_OC docker compose up` |
 | **An LLM endpoint** (one of: local OR Anthropic) | Deep mode — RLM Engine. Fast mode does **not** need an LLM. | Local: free, ~30 min one-time setup · Anthropic: paid per call | **Local** (any OpenAI-compatible URL): set `LOCAL_LLM_BASE_URL` (e.g. llama.cpp / Ollama / llama-swap). **Anthropic**: set `ANTHROPIC_API_KEY` + `ALLOW_ANTHROPIC=1`. Either one works — you don't need both. |
@@ -265,8 +267,11 @@ BEOPMANG_BASE_URL=https://api.beopmang.org/api/v4
 - [x] Test suite: 34 passing
 
 **Pending**
-- [ ] 헌법재판소 결정 (`detc`) — needs separate API permission registration at
-  open.law.go.kr beyond the base `OC` value
+- [x] 헌법재판소 결정 — covered by data.go.kr 헌법재판소 판례 API
+  (`/getRealmMainPrcdntList`), auto-approved with serviceKey. Smart-routed
+  in fast_search: only invoked when query mentions a constitution keyword
+  (헌법 / 헌재 / 위헌 / 합헌 / 기본권 / 탄핵 / etc.) to conserve the
+  1000/day rate limit.
 - [ ] chrisryugj/korean-law-mcp self-host wiring (client scaffolded; needs the
   caller to run the MCP server locally with their own OC key)
 - [ ] LexGuard self-host integration tests (hosted endpoint returns empty
@@ -300,6 +305,7 @@ Without these, kolaw would have to re-implement decades of work. Thank you.
 
 MIT — see [LICENSE](LICENSE).
 
+[datagokr-court]: https://www.data.go.kr/data/15123093/openapi.do
 [legalize-kr]: https://github.com/9bow/legalize-kr
 [chrisryugj]: https://github.com/chrisryugj/korean-law-mcp
 [lexguard]: https://github.com/SeoNaRu/lexguard-mcp

@@ -77,20 +77,30 @@ degrading.
   `law / prec / expc / decc / admrul / ordin`.
 - One target needs separate permission (see below): `detc` (헌재 결정).
 
-#### Enabling 헌법재판소 결정 (detc)
-A bare OC subscription does not include 헌재 결정 — open.law.go.kr returns a
-schema-only stub for `target=detc` until you explicitly opt in. Steps:
+#### 헌법재판소 결정 — superseded by data.go.kr
+The law.go.kr `detc` target requires a separate manual permission flow
+(신청관리 → 사용중지/추가신청 → 헌법재판소 결정, ~1 business day approval).
+We no longer recommend that path; instead we use the dedicated
+**data.go.kr 헌법재판소 판례 API**, which is auto-approved on registration
+and exposes individual decisions with case numbers (`2020헌마956` style).
 
-1. Log in at <https://open.law.go.kr>.
-2. Navigate to **신청관리 → 사용중지/추가신청** (top-right user menu).
-3. Find your registered project, click **추가신청**.
-4. Check **헌법재판소 결정** in the data-source list and submit.
-5. Wait for approval (typically 1 business day; you'll get an email).
-6. Re-run `LawGoKrClient().search_constitutional("...")` — it should now
-   return populated `detc` arrays.
+Setup:
+1. <https://www.data.go.kr/data/15123093/openapi.do> → 활용신청 (auto-approved on the spot)
+2. Copy the Decoding key from your portal profile
+3. `DATA_GO_KR_KEY=<key>` in `.env`
 
-The `services/data/law_go_kr.py` client already maps the response shape
-correctly; no code change is needed once the permission lands.
+The client in `services/data/data_go_kr_court.py` smart-routes inside
+fast_search: only fires when the query mentions a constitution keyword
+(헌법 / 헌재 / 위헌 / 합헌 / 기본권 / 탄핵 / 권한쟁의 / 정당해산 / etc.)
+so we don't burn the 1000/day budget on unrelated searches.
+
+The eventNm filter is a literal substring match against the case
+nickname, so multi-word queries get whittled down to the first
+non-stopword keyword (stripping "위헌" / "헌법" etc.) before the call.
+
+If `law_go_kr.py` ever does receive `detc` permission later, both
+sources can coexist — they return different shapes and the merge logic
+in fast_search handles dedup-by-(law_name, article).
 
 ### chrisryugj/korean-law-mcp (optional)
 - Wraps 16 of the 41 법제처 APIs as MCP tools, plus its headline

@@ -86,6 +86,24 @@ async def health():
             DataSourceStatus(name="law.go.kr", status="degraded", detail=str(exc))
         )
 
+    # data.go.kr 헌법재판소 판례 (separate auto-approved API; covers detc target
+    # without needing law.go.kr's manual permission flow)
+    try:
+        from services.data.data_go_kr_court import DataGoKrCourtClient
+
+        ok, msg = await DataGoKrCourtClient().is_available()
+        sources.append(
+            DataSourceStatus(
+                name="data.go.kr-헌재",
+                status="ok" if ok else "degraded",
+                detail=msg,
+            )
+        )
+    except Exception as exc:
+        sources.append(
+            DataSourceStatus(name="data.go.kr-헌재", status="degraded", detail=str(exc))
+        )
+
     # LexGuard MCP (Phase 4) — optional reranker / domain classifier
     try:
         from services.data.lexguard_client import LexGuardClient
