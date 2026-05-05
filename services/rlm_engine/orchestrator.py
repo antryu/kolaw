@@ -25,6 +25,8 @@ Reference: arXiv 2512.24601v2 (Recursive Language Models)
 from __future__ import annotations
 
 import logging
+import asyncio
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -38,23 +40,39 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 
 _SYSTEM_PROMPT = """You are a Korean legal research assistant operating in a REPL loop.
-You have access to law_texts (a dict mapping law_name to article text).
-Your job: write Python code that sets FINAL_ANSWER to a list of relevant citation dicts.
 
-Each citation dict MUST have: law_id, law_name, article, excerpt.
+Two data sources are pre-loaded into your namespace. Either may be empty.
 
-Example:
+1) law_texts : dict[str, str]
+   - law_name -> first ~20 articles from the offline legalize-kr corpus.
+   - Empty if the corpus is not mounted on this machine.
+
+2) live_results : dict[str, list[dict]]
+   - Keys: "law", "precedent", "interpretation".
+   - Each list item is {id, name, type, date, url} from law.go.kr.
+   - Empty if LAW_GO_KR_OC is not set or the live fetch failed.
+
+Your job: write Python that sets FINAL_ANSWER to a list of citation dicts.
+Each citation MUST have: law_id, law_name, article, excerpt.
+
+Picking source:
+- Statute body / specific clause language  -> law_texts
+- Case law (판례), interpretations         -> live_results["precedent"], live_results["interpretation"]
+- Legal name / metadata only               -> live_results["law"]
+- If both have signal, combine them.
+- If both are empty: FINAL_ANSWER = []   (do NOT fabricate).
+
+Example combining both sources:
 ```python
-relevant = []
+hits = []
 for name, text in law_texts.items():
-    if "수소충전소" in text or "허가" in text:
-        relevant.append({
-            "law_id": "unknown",
-            "law_name": name,
-            "article": "제1조",
-            "excerpt": text[:200],
-        })
-FINAL_ANSWER = relevant[:5]
+    if "허가" in text or "요건" in text:
+        hits.append({"law_id": "legalize-kr", "law_name": name,
+                     "article": "법률", "excerpt": text[:200]})
+for it in live_results.get("precedent", []):
+    hits.append({"law_id": it["id"], "law_name": it["name"],
+                 "article": "판례", "excerpt": it.get("type", "")})
+FINAL_ANSWER = hits[:5]
 ```
 
 Write only valid Python. No imports. Set FINAL_ANSWER before the code ends."""
@@ -104,9 +122,8 @@ async def run(
                 law_texts[tree.law_name] = combined
         log.steps.append({"step": "law_load", "count": len(law_texts), "source": "caller"})
     else:
-        # Pre-filter via grep_search over legalize-kr (Phase 3 — replaces ChromaDB).
-        # Loads the matching laws' first-N articles into the REPL session so the
-        # LLM has real corpus text to work from.
+        # Pre-filter via grep_search over legalize-kr (offline). Skipped silently
+        # if the corpus is not mounted — live_results below covers that case.
         try:
             from services.data.legalize_kr import grep_search, load_law
 
@@ -125,13 +142,65 @@ async def run(
                  "source": "grep_search", "mode": grep_result.mode}
             )
         except Exception as exc:
-            logger.warning("grep_search prefilter failed: %s", exc)
+            logger.warning("grep_search prefilter failed (corpus missing?): %s", exc)
             log.steps.append({"step": "law_prefilter", "error": str(exc)})
 
-    # Step 2: set up REPL session
+    # Live results from law.go.kr Open API (Option C — hybrid). Fetched in parallel
+    # so the LLM has access to fresh case law / interpretations even when the
+    # offline corpus is missing or stale. Empty {} if OC not configured or
+    # everything fails — the REPL prompt tells the LLM how to handle that.
+    live_results: dict[str, list[dict]] = {"law": [], "precedent": [], "interpretation": []}
+    try:
+        if os.getenv("LAW_GO_KR_OC"):
+            from services.data.law_go_kr import LawGoKrClient
+
+            client = LawGoKrClient()
+            law_items, prec_items, expc_items = await asyncio.gather(
+                client.search_law(query, display=5),
+                client.search_precedent(query, display=5),
+                client.search_interpretation(query, display=3),
+                return_exceptions=True,
+            )
+
+            def _to_dicts(items):
+                if isinstance(items, BaseException) or not items:
+                    return []
+                return [
+                    {
+                        "id": it.item_id,
+                        "name": it.title,
+                        "type": it.subtitle,
+                        "date": it.enforced_at,
+                        "url": it.detail_url,
+                    }
+                    for it in items
+                ]
+
+            live_results = {
+                "law": _to_dicts(law_items),
+                "precedent": _to_dicts(prec_items),
+                "interpretation": _to_dicts(expc_items),
+            }
+            log.steps.append(
+                {
+                    "step": "live_search",
+                    "source": "law.go.kr",
+                    "law": len(live_results["law"]),
+                    "precedent": len(live_results["precedent"]),
+                    "interpretation": len(live_results["interpretation"]),
+                }
+            )
+        else:
+            log.steps.append({"step": "live_search", "skipped": "LAW_GO_KR_OC not set"})
+    except Exception as exc:
+        logger.warning("law.go.kr live fetch failed: %s", exc)
+        log.steps.append({"step": "live_search", "error": str(exc)})
+
+    # Step 2: set up REPL session — both sources injected, either may be empty
     session = RLMSession()
     session.load("query", query)
     session.load("law_texts", law_texts)
+    session.load("live_results", live_results)
 
     # Step 3-6: LLM → code → exec → FINAL_ANSWER
     from services.llm import router

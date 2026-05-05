@@ -24,7 +24,7 @@
 |---|---|---|
 | **OC 등록** at <https://open.law.go.kr> | 법제처 Open API 호출 — 6개 source 즉시 활성화 (법령/판례/해석/행심/행정규칙/조례) | 회원가입 + 프로젝트명 등록 ~5분 (즉시 승인) |
 | **헌법재판소 결정 추가 신청** | 7번째 source `detc` (헌재 결정) 활성화 | 신청관리 → 사용중지/추가신청 → 헌법재판소 결정 체크 → 약 1일 승인 대기 |
-| **legalize-kr 로컬 클론** | 오프라인 법령 본문 + 개정 이력 (git log) | `git clone github.com/9bow/legalize-kr` ~3분 |
+| **legalize-kr 로컬 클론** *(권장, 필수는 아님)* | 오프라인 법령 본문 + 개정 이력 (git log). 안 받아도 OC 등록되어 있으면 live API로 작동 | `git clone github.com/9bow/legalize-kr` ~3분 |
 | (옵션) **로컬 LLM** | Deep 모드 (RLM 엔진) — Fast 모드는 LLM 없이 작동 | llama.cpp / Ollama / llama-swap 등 |
 
 ⚠️ **`OC` 값은 비밀 키가 아니라 본인이 정한 프로젝트 이름** (사용자명처럼 다루세요). 코드 안에 baked-in된 키 없음 — 본인이 직접 등록해서 `LAW_GO_KR_OC` 환경변수에 넣으세요.
@@ -50,6 +50,38 @@ Korean law tooling has matured rapidly — multiple excellent MCP servers exist
   `"의료 또는 외국인"` (OR). All shorthand recognized.
 - **LLM-driven autonomous search (RLM)** for queries pure keyword search can't handle —
   experimental, requires local LLM.
+
+## 🎒 어떻게 동작하는지 (간단 설명)
+
+비유로 설명하면:
+
+**상황**: 우리한테 "법령 박사" AI 비서가 있어요. 친구가 "내가 의료법 어기면 어떻게 돼?" 물어봤어요. AI 비서가 답하려면 **법령 자료**가 필요합니다.
+
+자료를 가져오는 방법은 두 가지:
+
+| 방법 | 비유 | 실제로는 |
+|---|---|---|
+| **책상에 책 쌓아놓기** | 한국 법령 책 2,300권을 미리 책상에 쌓아둠 | `legalize-kr` repo를 로컬에 클론 (~251MB) |
+| **도서관에 전화하기** | 필요할 때마다 정부 도서관(법제처)에 전화 | `law.go.kr` Open API 호출 (`OC=YourName` 등록 필요) |
+
+kolaw는 **두 가지를 동시에 사용**합니다:
+
+```
+질문이 들어오면
+  ├─ Fast 모드: 책상 책 + 도서관 전화 → 결과 합쳐서 즉시 반환
+  └─ Deep 모드 (RLM): 책상 책 + 도서관 결과 둘 다 AI 비서한테 주고
+                    → AI 비서가 직접 코드 짜서 분석
+```
+
+각 source는 **있으면 쓰고, 없어도 진행**합니다:
+- 책상에 책 안 쌓아도 (`legalize-kr` 안 받아도) → **도서관 전화로만 작동** (OC만 등록되어 있으면)
+- 도서관 등록 안 해도 (`OC` 비어있으면) → **책상 책으로만 작동** (legalize-kr 클론되어 있으면)
+- 둘 다 있으면 → **가장 풍부한 답변** (offline 본문 + live 판례·해석 종합)
+- 둘 다 없으면 → 빈 결과 반환 (거짓 정보 만들지 않음)
+
+이게 RLM이 "본문 보고 직접 추론"하는 차이점입니다. 그냥 검색만 하는 게 아니라, AI가 자료들을 보고 **어떤 조항이 친구 상황에 적용되는지 직접 코드를 짜서 분석**해요.
+
+> 참고: Deep 모드 (RLM)는 로컬 LLM 필요 (예: M4에서 Qwen3-32B). Fast 모드는 LLM 없이 작동.
 
 ## Architecture
 
@@ -101,8 +133,8 @@ registration / setup**. Nothing here is shipped with credentials baked in.
 
 | You provide | What for | How long | Where |
 |-------------|----------|----------|-------|
-| **`LAW_GO_KR_OC`** — a project name registered at open.law.go.kr | Unlocks 6 of 7 live sources: 법령 / 판례 / 법령해석례 / 행정심판 / 행정규칙 / 자치법규 | ~5 min to register; instant approval | <https://open.law.go.kr/LSO/openApi/guideList.do> |
-| `legalize-kr` repo cloned locally | Offline 2,300+ statute corpus + git revision history | ~3 min | `git clone github.com/9bow/legalize-kr` |
+| **`LAW_GO_KR_OC`** — a project name registered at open.law.go.kr | Unlocks 6 of 7 live sources: 법령 / 판례 / 법령해석례 / 행정심판 / 행정규칙 / 자치법규. Sufficient for both Fast and Deep mode. | ~5 min to register; instant approval | <https://open.law.go.kr/LSO/openApi/guideList.do> |
+| `legalize-kr` repo cloned locally **(optional but recommended)** | Adds offline statute *body text* + git revision history alongside the live API. Without it, kolaw falls back to live-only results. | ~3 min | `git clone github.com/9bow/legalize-kr` |
 
 The `OC` value is **not a secret** — it's the project name you chose on
 open.law.go.kr (treat it like a username). All this repo's code paths
@@ -237,7 +269,10 @@ BEOPMANG_BASE_URL=https://api.beopmang.org/api/v4
 - [ ] Optional ChromaDB vector index (`sentence-transformers`) — deferred; the
   current keyword + live-API combo handles most queries without it
 - [ ] RLM production hardening — multi-turn retries when the LLM emits
-  syntactically broken Python; `RestrictedPython` / Docker sandbox for the REPL
+  syntactically broken Python; `RestrictedPython` / Docker sandbox for the REPL.
+  (Hybrid data injection — Option C, both `legalize-kr` corpus and `law.go.kr`
+  live results in the REPL — landed in this iteration; RLM no longer requires
+  the offline corpus to give useful answers.)
 - [ ] kolaw-as-MCP-server wrapper — expose `/search` as an MCP tool so Claude
   Desktop / Cursor can consume kolaw directly
 
