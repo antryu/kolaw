@@ -10,3 +10,4 @@ dist/
 chroma_data/
 chroma_db/
 *.db
+.env.bak
