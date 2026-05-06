@@ -239,17 +239,35 @@ async def run(
         if final_answer is not None:
             break
 
-        # Feed back error for retry
+        # Feed back error for retry — branch on what actually went wrong so
+        # the LLM gets a useful hint instead of a generic re-prompt.
         messages.append({"role": "assistant", "content": generated_code})
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    f"FINAL_ANSWER was not set (exec result: {exec_result}). "
-                    "Fix the code and try again. You MUST set FINAL_ANSWER."
-                ),
-            }
-        )
+        result_str = (exec_result or "").strip()
+        if result_str.startswith(("CompileError:", "SyntaxError:")):
+            hint = (
+                f"Your code did not compile under the sandbox: {result_str}. "
+                "Rewrite without imports, dunder access, or file/network calls. "
+                "Use only plain dict/list operations on law_texts and live_results, "
+                "then set FINAL_ANSWER."
+            )
+        elif result_str.startswith("TimeoutError:"):
+            hint = (
+                f"{result_str}. Your previous code looped too long. "
+                "Avoid while-True or unbounded recursion; iterate over law_texts.items() "
+                "and break early once you have enough citations."
+            )
+        elif result_str.startswith("ExecError:"):
+            hint = (
+                f"Your code raised at runtime: {result_str}. "
+                "Re-check key access (use .get(...)) and types, then set FINAL_ANSWER "
+                "to a list of citation dicts with keys law_id, law_name, article, excerpt."
+            )
+        else:
+            hint = (
+                f"FINAL_ANSWER was not set (exec output: {result_str or 'no output'}). "
+                "You MUST end your code with FINAL_ANSWER = [...] (a list of citation dicts)."
+            )
+        messages.append({"role": "user", "content": hint})
 
     log.final_answer = final_answer
     log.elapsed_ms = (time.perf_counter() - t0) * 1000
