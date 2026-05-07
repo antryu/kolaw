@@ -324,6 +324,7 @@ def _trajectory_to_response(
                         article=item.get("article", ""),
                         version=item.get("version", ""),
                         excerpt=str(item.get("excerpt", ""))[:300],
+                        source="lawxref",
                     )
                 )
 
@@ -345,13 +346,86 @@ def _trajectory_to_response(
     )
 
 
+async def _pageindex_citations(query: str) -> list[Citation]:
+    """
+    Run PageIndex layer if a known law name is detected in the query.
+    Returns citations tagged source='pageindex'. Empty list on any failure
+    (no tree mapped, navigator empty, file missing) — caller treats as
+    "no PageIndex contribution; fall back to RLM-only result".
+
+    PageIndex tree JSONs live in y-company; path via PAGEINDEX_TREES_DIR env.
+    """
+    try:
+        from services.pageindex.loader import detect_law_name
+        from services.pageindex.retriever import pageindex_retrieve
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("PageIndex import failed: %s", exc)
+        return []
+
+    law_name = detect_law_name(query)
+    if not law_name:
+        return []
+
+    try:
+        result = await pageindex_retrieve(law_name, query, char_budget=8000)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("PageIndex retrieve raised: %s", exc)
+        return []
+
+    if not result.tree_available or not result.articles:
+        return []
+
+    citations: list[Citation] = []
+    for art in result.articles[:5]:
+        citations.append(
+            Citation(
+                law_id=f"pageindex:{art.parent_id}",
+                law_name=law_name,
+                article=art.node_id or art.title,
+                version="",  # PageIndex trees do not carry 시행일자
+                excerpt=(art.body or art.title)[:280],
+                source="pageindex",
+            )
+        )
+    return citations
+
+
 async def deep_search(req: SearchRequest) -> SearchResponse:
     """
-    Phase 2 deep search via minimal RLM loop.
+    Phase 2 deep search via minimal RLM loop, optionally merged with PageIndex.
+
+    PageIndex layer (Buildy 2026-05-07, 의장 결재 옵션 B):
+      If query mentions a law mapped in services.pageindex.loader.TREE_FILENAMES,
+      run hierarchical tree navigation in parallel with the RLM loop and merge
+      the resulting article citations (tagged source='pageindex') into the
+      response. PageIndex failures are silent — RLM result still returned.
+
     On local LLM unavailable: returns 503-equivalent response with error field.
     """
-    log = await run(query=req.query, laws=req.laws or None)
-    return _trajectory_to_response(log, req)
+    import asyncio as _asyncio
+
+    log_task = _asyncio.create_task(run(query=req.query, laws=req.laws or None))
+    pi_task = _asyncio.create_task(_pageindex_citations(req.query))
+
+    log = await log_task
+    pi_citations = await pi_task
+
+    response = _trajectory_to_response(log, req)
+    if pi_citations:
+        # Merge PageIndex hits at the front (cross-cut context first).
+        # Always merge, even when RLM errored — PageIndex is an independent
+        # retrieval layer; lawxref(rag) on caller side still benefits.
+        merged = pi_citations + list(response.citations)
+        update: dict = {"citations": merged[:10]}
+        if response.error == "local_llm_unavailable":
+            # RLM failed but PageIndex succeeded — clear error so caller
+            # treats this as a partial success (PageIndex-only deep result).
+            # The 'source' field on each citation distinguishes the layer.
+            update["error"] = None
+            update["verdict"] = "ambiguous"
+            update["confidence"] = 0.5
+        response = response.model_copy(update=update)
+    return response
 
 
 async def deep_search_mock(req: SearchRequest) -> SearchResponse:
