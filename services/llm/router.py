@@ -93,9 +93,13 @@ async def _call_local(
 ) -> str:
     """Call local llama-swap OpenAI-compatible endpoint."""
     url = f"{_LOCAL_BASE_URL}/chat/completions"
+    # Qwen3 thinking models suppress the <think> block via /no_think suffix on
+    # the last user message. Without it, reasoning_content consumes the token
+    # budget and content is empty, causing local_llm_unavailable errors.
+    patched_messages = _inject_no_think(messages)
     payload: dict[str, Any] = {
         "model": model,
-        "messages": messages,
+        "messages": patched_messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
@@ -103,7 +107,39 @@ async def _call_local(
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        msg = data["choices"][0]["message"]
+        content = msg.get("content") or ""
+        if not content.strip():
+            raise RuntimeError(
+                "Local LLM returned empty content even with /no_think. "
+                "Check max_tokens or llama-swap model."
+            )
+        return content
+
+
+def _inject_no_think(messages: list[dict]) -> list[dict]:
+    """Append /no_think to the last user message if not already present.
+
+    Qwen3 thinking models suppress the <think> block when the user message
+    ends with /no_think, putting the answer directly in content rather than
+    reasoning_content. This prevents token-budget exhaustion on short calls.
+    """
+    if not messages:
+        return messages
+    last_user_idx = None
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i].get("role") == "user":
+            last_user_idx = i
+            break
+    if last_user_idx is None:
+        return messages
+    last_content = messages[last_user_idx].get("content", "")
+    if "/no_think" in last_content:
+        return messages
+    patched = list(messages)
+    patched[last_user_idx] = dict(patched[last_user_idx])
+    patched[last_user_idx]["content"] = last_content + "\n\n/no_think"
+    return patched
 
 
 async def _call_anthropic(
