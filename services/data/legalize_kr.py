@@ -182,6 +182,7 @@ async def grep_search(
     query: str,
     mode: Literal["AND", "OR"] | None = None,
     limit: int = 10,
+    law_filter: list[str] | None = None,
 ) -> GrepResult:
     """
     Multi-keyword search over legalize-kr file contents via `git grep`.
@@ -221,7 +222,12 @@ async def grep_search(
         args.append("--all-match")
     for kw in keywords:
         args.extend(["-e", kw])
-    args.extend(["--", "kr/"])
+    # If law_filter provided, scope git grep to only those law directories.
+    if law_filter:
+        paths = [f"kr/{name}/" for name in law_filter]
+    else:
+        paths = ["kr/"]
+    args.extend(["--"] + paths)
 
     try:
         proc = await asyncio.create_subprocess_exec(
