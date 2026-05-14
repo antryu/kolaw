@@ -27,7 +27,16 @@ VERSION = "0.1.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: nothing heavy in Phase 1
+    # Phase 2 — warmup BM25 + ChromaDB to avoid cold-start timeout
+    import logging
+    _logger = logging.getLogger(__name__)
+    try:
+        from services.fast_search.search import _get_collection, _get_bm25_index
+        _col = _get_collection()
+        _get_bm25_index(_col)
+        _logger.info("kolaw startup: BM25 + collection warmed")
+    except Exception as _e:
+        _logger.warning("kolaw warmup failed: %s", _e)
     yield
     # Shutdown
 
