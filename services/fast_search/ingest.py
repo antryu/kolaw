@@ -4,8 +4,8 @@ ChromaDB ingest script for Phase 1 fixture data.
 Source: ~/PRJs/hydrogen-law/services/rag-engine/law_documents.json
 Uses first 5 documents from that file as the Phase 1 fixture.
 
-Embeddings: jhgan/ko-sroberta-multitask (matches hydrogen-law stack)
-Collection: "kolaw_laws"
+Embeddings: BAAI/bge-m3 (1024-dim multilingual)
+Collection: KOLAW_COLLECTION env override, default "kolaw_laws_v2"
 
 Run: python -m services.fast_search.ingest
 """
@@ -25,7 +25,8 @@ _FIXTURE_PATH = Path(
         str(Path.home() / "PRJs/hydrogen-law/services/rag-engine/law_documents.json"),
     )
 )
-_COLLECTION_NAME = "kolaw_laws"
+_COLLECTION_NAME = os.getenv("KOLAW_COLLECTION", "kolaw_laws")
+_EMBEDDING_MODEL = os.getenv("KOLAW_EMBEDDING_MODEL", "jhgan/ko-sroberta-multitask")
 _CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 _CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 _FIXTURE_LIMIT = int(os.getenv("FIXTURE_LIMIT", "5"))
@@ -51,8 +52,24 @@ def get_chroma_client():
 def get_embedding_function():
     from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
+    # Force MPS (Apple Silicon GPU) when available; falls back to CPU otherwise.
+    # Default device=None lets sentence-transformers pick CPU on macOS — too slow
+    # for full re-ingest of 130K chunks (43+ hr CPU vs ~2 hr MPS for bge-m3).
+    device = os.getenv("KOLAW_EMBEDDING_DEVICE")
+    if not device:
+        try:
+            import torch
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
+        except Exception:
+            device = "cpu"
     return SentenceTransformerEmbeddingFunction(
-        model_name="jhgan/ko-sroberta-multitask"
+        model_name=_EMBEDDING_MODEL,
+        device=device,
     )
 
 

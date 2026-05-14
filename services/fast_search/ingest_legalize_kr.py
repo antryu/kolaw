@@ -1,23 +1,29 @@
 """
-legalize-kr full ingest — Phase 2.
+legalize-kr full ingest — Phase B.1.
 
 Ingests all 2303 laws from ~/Thairon/legalize-kr/ into ChromaDB.
 
 Source layout:
-  ~/Thairon/legalize-kr/kr/<law_folder>/법률.md  (+ 시행령.md, 시행규칙.md)
+  ~/Thairon/legalize-kr/kr/<law_folder>/<type>.md
+  where <type> is any stem: 법률, 시행령, 시행규칙, 대통령령, 대법원규칙,
+  총리령, 각부부령 (국토교통부령, 법무부령 etc), 국회규칙, 감사원규칙, 헌법 etc.
+
+Phase B.1 change: file_type is now dynamic (all .md stems), not limited to 3.
+  Previous: 법률 + 시행령 + 시행규칙 → ~3,204 files / 131,713 docs
+  Phase B.1: all 4,221 files → ~+1,017 files newly indexed
 
 Article chunking:
   Splits on 제N조 headings (same regex as services/data/legalize_kr.py).
   Each chunk = one ChromaDB document.
 
-Embedding: jhgan/ko-sroberta-multitask (matches Phase 1 stack)
-Collection: kolaw_laws (shared with Phase 1 fixture data)
+Embedding: BAAI/bge-m3 (1024-dim multilingual; KOLAW_EMBEDDING_MODEL override)
+Collection: KOLAW_COLLECTION env override, default kolaw_laws_v3
 Dedup: law_id + article_number compound key → skip if already present
 
 Progress: prints every 10 laws.
 
 Run:
-  python -m services.fast_search.ingest_legalize_kr
+  KOLAW_COLLECTION=kolaw_laws_v3 python -m services.fast_search.ingest_legalize_kr
   python -m services.fast_search.ingest_legalize_kr --test 100  (test mode)
   CHROMA_PERSIST_PATH=./services/fast_search/chroma_db python -m services.fast_search.ingest_legalize_kr
 """
@@ -46,7 +52,8 @@ _CHROMA_PERSIST = os.getenv(
     str(Path(__file__).parent / "chroma_db"),
 )
 
-_COLLECTION_NAME = "kolaw_laws"
+_COLLECTION_NAME = os.getenv("KOLAW_COLLECTION", "kolaw_laws_v3")
+_EMBEDDING_MODEL = os.getenv("KOLAW_EMBEDDING_MODEL", "jhgan/ko-sroberta-multitask")
 _LOG_EVERY = 10  # print progress every N laws
 _CHUNK_BATCH = 128  # docs per ChromaDB upsert call
 
@@ -100,12 +107,15 @@ def _split_articles(text: str) -> list[tuple[str, str, str]]:
 def _law_docs(law_dir: Path) -> Iterator[tuple[str, dict, str]]:
     """
     Yield (doc_id, metadata, content) for each article chunk in a law folder.
-    Processes 법률.md, 시행령.md, 시행규칙.md if present.
+    Processes ALL .md files present — stem becomes file_type metadata.
+
+    Phase B.1: expanded from 3 fixed types (법률/시행령/시행규칙) to all types
+    including 대통령령, 대법원규칙, 총리령, 각부부령, etc.
     """
+    # Discover all .md files in the law folder; stem = file_type
     file_map = {
-        "법률": law_dir / "법률.md",
-        "시행령": law_dir / "시행령.md",
-        "시행규칙": law_dir / "시행규칙.md",
+        md_file.stem: md_file
+        for md_file in sorted(law_dir.glob("*.md"))
     }
 
     law_name = law_dir.name
@@ -156,7 +166,16 @@ def _law_docs(law_dir: Path) -> Iterator[tuple[str, dict, str]]:
                 "ingested_at": ingested_at,
             }
             # ChromaDB has 512-char metadata string limit; content in document field
-            yield doc_id, metadata, content[:8000]  # truncate very long articles
+            # Prepend law_name + article so where_document $contains hits the law's
+            # OWN chunks (not just other laws referencing it). Keeps semantic search
+            # grounded — "근로기준법" filter will surface 근로기준법 articles, not
+            # only 임금채권보장법 references.
+            # Include article_title in head so BM25/vector can match on title keywords
+            # e.g. 근로기준법 §60 head = "[근로기준법 제60조 (연차 유급휴가)] "
+            # Without this, "연차" won't match §60 since the body text may not contain it.
+            title_part = f" {article_title}" if article_title else ""
+            head = f"[{law_display} {article_num}{title_part}] "
+            yield doc_id, metadata, (head + content)[:8000]
 
 
 def get_chroma_client(persist_path: str = _CHROMA_PERSIST):
@@ -170,8 +189,21 @@ def get_chroma_client(persist_path: str = _CHROMA_PERSIST):
 def get_embedding_function():
     from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
+    device = os.getenv("KOLAW_EMBEDDING_DEVICE")
+    if not device:
+        try:
+            import torch
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
+        except Exception:
+            device = "cpu"
     return SentenceTransformerEmbeddingFunction(
-        model_name="jhgan/ko-sroberta-multitask"
+        model_name=_EMBEDDING_MODEL,
+        device=device,
     )
 
 
@@ -179,6 +211,7 @@ def ingest_legalize_kr(
     corpus_path: Path = _CORPUS_PATH,
     persist_path: str = _CHROMA_PERSIST,
     limit: int | None = None,
+    embedding_function=None,
 ) -> dict[str, int]:
     """
     Ingest legalize-kr corpus into ChromaDB.
@@ -187,6 +220,7 @@ def ingest_legalize_kr(
         corpus_path: Path to legalize-kr/kr/ directory.
         persist_path: ChromaDB persist directory.
         limit: Max number of law directories to process (None = all).
+        embedding_function: Optional embedding function override for tests.
 
     Returns:
         {"laws_processed": N, "docs_ingested": M, "docs_skipped": K}
@@ -198,7 +232,7 @@ def ingest_legalize_kr(
         )
 
     client = get_chroma_client(persist_path)
-    ef = get_embedding_function()
+    ef = embedding_function or get_embedding_function()
     collection = client.get_or_create_collection(
         name=_COLLECTION_NAME,
         embedding_function=ef,
