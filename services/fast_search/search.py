@@ -72,6 +72,8 @@ _LAW_NAME_ALIASES: dict[str, list[str]] = {
     "부동산등기법": ["부동산등기"],
     "신탁법": ["신탁"],
     "상법": ["상법"],
+    # Cycle 4: 형사소송법 corpus added (2026-05-15)
+    "형사소송법": ["형사소송법", "형소법"],
 }
 
 
@@ -87,11 +89,13 @@ _LAW_DIR_TO_CANONICAL: dict[str, str] = {
     "jabonsijang": "자본시장법",
     "suso": "수소법",
     "gpgas": "고압가스법",
-    # E3 (cycle 3): 4 special law (형사소송법 corpus 없어 제외)
+    # E3 (cycle 3): 4 special law
     "가사소송법": "가사소송법",
     "부동산등기법": "부동산등기법",
     "신탁법": "신탁법",
     "상법": "상법",
+    # Cycle 4: 형사소송법 corpus added (2026-05-15)
+    "형사소송법": "형사소송법",
 }
 
 
