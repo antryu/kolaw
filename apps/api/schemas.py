@@ -17,17 +17,21 @@ class Citation(BaseModel):
     article: str = Field(..., description="조문 참조, e.g. '§2(7)'")
     version: str = Field(..., description="시행일자 YYYYMMDD, e.g. '20251001'")
     excerpt: str = Field(..., description="원문 발췌 (max 200 chars)")
-    source: str | None = Field(
-        None,
-        description="Retrieval source tag. None=default (legalize-kr/law.go.kr). "
-        "'pageindex'=hierarchical tree navigation layer (deep mode).",
-    )
 
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="검색 쿼리")
-    mode: Literal["fast", "deep"] = Field("fast", description="fast=ChromaDB BM25, deep=RLM engine")
+    mode: Literal["fast", "deep"] = Field(
+        "deep",
+        description=(
+            "fast=hybrid BM25+vector + qwen3 rerank (local, ~5-20s); "
+            "deep=hybrid BM25+vector + Opus 4.7 rerank (Anthropic API, ~10-25s). "
+            "Both modes use the same hybrid retrieval pipeline. "
+            "Use rlm=true for full RLM multi-step reasoning."
+        ),
+    )
     laws: list[str] | None = Field(None, description="특정 law_id 필터 (optional)")
+    rlm: bool = Field(False, description="Set true to use Phase 3 RLM engine for deep multi-step reasoning")
 
 
 class SearchResponse(BaseModel):

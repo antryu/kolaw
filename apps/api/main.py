@@ -78,83 +78,23 @@ async def health():
             DataSourceStatus(name="legalize-kr", status="degraded", detail=str(exc))
         )
 
-    # law.go.kr direct API (Phase 3)
-    try:
-        from services.data.law_go_kr import LawGoKrClient
-
-        ok, msg = await LawGoKrClient().is_available()
-        sources.append(
-            DataSourceStatus(
-                name="law.go.kr",
-                status="ok" if ok else "degraded",
-                detail=msg,
-            )
-        )
-    except Exception as exc:
-        sources.append(
-            DataSourceStatus(name="law.go.kr", status="degraded", detail=str(exc))
-        )
-
-    # data.go.kr 헌법재판소 판례 (separate auto-approved API; covers detc target
-    # without needing law.go.kr's manual permission flow)
-    try:
-        from services.data.data_go_kr_court import DataGoKrCourtClient
-
-        ok, msg = await DataGoKrCourtClient().is_available()
-        sources.append(
-            DataSourceStatus(
-                name="data.go.kr-헌재",
-                status="ok" if ok else "degraded",
-                detail=msg,
-            )
-        )
-    except Exception as exc:
-        sources.append(
-            DataSourceStatus(name="data.go.kr-헌재", status="degraded", detail=str(exc))
-        )
-
-    # LexGuard MCP (Phase 4) — optional reranker / domain classifier
-    try:
-        from services.data.lexguard_client import LexGuardClient
-
-        ok, msg = await LexGuardClient().is_available()
-        sources.append(
-            DataSourceStatus(
-                name="lexguard-mcp",
-                status="ok" if ok else "degraded",
-                detail=msg,
-            )
-        )
-    except Exception as exc:
-        sources.append(
-            DataSourceStatus(name="lexguard-mcp", status="degraded", detail=str(exc))
-        )
-
-    # beopmang: stub (Phase 1 — supplementary metadata)
+    # beopmang: stub check (Phase 1 — no live call in health)
     sources.append(
         DataSourceStatus(
             name="beopmang",
             status="ok",
-            detail="client wired; supplementary metadata source",
+            detail="client wired; Phase 1 stub",
         )
     )
 
-    # korean-law-mcp (chrisryugj) — optional self-hosted MCP. Probe live.
-    try:
-        from services.data.kolmcp_client import KolMCPClient
-
-        ok, msg = await KolMCPClient().is_available()
-        sources.append(
-            DataSourceStatus(
-                name="korean-law-mcp",
-                status="ok" if ok else "degraded",
-                detail=msg,
-            )
+    # korean-law-mcp: stub
+    sources.append(
+        DataSourceStatus(
+            name="korean-law-mcp",
+            status="ok",
+            detail="64 tools documented; Phase 1 stub — no live MCP call",
         )
-    except Exception as exc:
-        sources.append(
-            DataSourceStatus(name="korean-law-mcp", status="degraded", detail=str(exc))
-        )
+    )
 
     overall = (
         "ok"
@@ -167,20 +107,21 @@ async def health():
 @app.post("/search", response_model=SearchResponse)
 async def search(req: SearchRequest, response: Response) -> SearchResponse:
     """
-    Law search endpoint.
-    mode=fast: ChromaDB vector search.
-    mode=deep: RLM engine.
-      Production: uses deep_search() (real minimal RLM loop, requires local LLM).
-      Compat: uses deep_search_mock() stub for Phase 1 backward compat.
-      Switch to deep_search when local LLM (llama-swap) is running.
-      On local LLM unavailable: returns 503 with error='local_llm_unavailable'.
+    Law search endpoint — Y option hybrid retrieval.
+
+    mode=fast:  BM25 + vector hybrid + qwen3 rerank (local llama-swap, ~5-20s)
+    mode=deep:  BM25 + vector hybrid + Claude Opus 4.7 rerank (~10-25s, ALLOW_ANTHROPIC required)
+
+    Both modes use the same hybrid retrieval pipeline (BM25 + ChromaDB + RRF + law_id boost).
+    The `mode` param selects only the LLM reranker. Default is deep.
+
+    rlm=true:   Phase 3 RLM multi-step reasoning engine (requires local LLM, ~30-120s).
+                Uses same hybrid retrieval as prefilter, then orchestrates sub-LLM calls.
     """
-    if req.mode == "fast":
-        return await fast_search(req)
-    else:
-        # Phase 2: use mock stub for backward compat; switch to deep_search when LLM ready.
-        # deep_search() is implemented and tested separately via test_rlm_minimal_loop.py.
+    if req.rlm:
         return await deep_search(req)
+    # Both fast and deep use hybrid retrieval; mode drives the reranker LLM.
+    return await fast_search(req)
 
 
 @app.post("/search/batch", response_model=BatchSearchResponse)
@@ -190,9 +131,9 @@ async def search_batch(req: BatchSearchRequest) -> BatchSearchResponse:
     """
     results = []
     for query in req.queries:
-        if query.mode == "fast":
-            result = await fast_search(query)
-        else:
+        if query.rlm:
             result = await deep_search(query)
+        else:
+            result = await fast_search(query)
         results.append(result)
     return BatchSearchResponse(results=results)

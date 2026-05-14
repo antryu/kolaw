@@ -1,285 +1,114 @@
 """
-RLM Orchestrator — Phase 2 minimal loop.
+RLM Orchestrator — Phase 3 (Trajectory + Budget + sub_llm).
 
-run(query, laws=None) -> TrajectoryLog:
-  1. Pre-filter: fast_search top-10 laws OR use caller-supplied laws list
-  2. Load law text into REPL namespace
-  3. Build system prompt + user query
-  4. Call local LLM (router.complete) → generated Python code
-  5. exec() code in RLMSession (sandboxed builtins)
-  6. Capture FINAL_ANSWER variable
-  7. Retry up to MAX_RETRIES on missing FINAL_ANSWER
-  8. Return TrajectoryLog
+Phase 3 flow per call:
+  1. Trajectory.new() + TokenBudget()
+  2. fast_search prefilter (or caller-supplied laws) → top 5–10 candidates
+  3. Load law text via legalize_kr.load_law() → law_texts dict
+     {law_name: {article_number: content}}
+  4. RLMSession.load("query", query) + load("law_texts", law_texts)
+  5. inject_callable("sub_llm", make_sub_llm(...)) — depth=1 child for sub-LLM
+  6. router.complete(messages) for root; record root_completion event
+  7. session.exec(root_code) — sub_llm calls self-record on trajectory
+  8. session.get("FINAL_ANSWER"); retry up to MAX_RETRIES if missing
+  9. Record final_answer event; set elapsed_ms
+ 10. KOLAW_PERSIST_TRAJECTORY=1 → traj.persist()
+ 11. Build SearchResponse with trajectory_id
 
-Degradation (#3 resolved):
-  - Local LLM failure → router.complete raises RuntimeError
-  - Orchestrator catches it → returns {"verdict": null, "error": "local_llm_unavailable",
-    "trajectory_id": null, "mode": "deep"} with HTTP 503
-  - No silent fallback. Caller (Legaly agent) decides.
+Errors → SearchResponse.error one of:
+  - "budget_exceeded"          (BudgetExceeded raised)
+  - "recursion_depth_exceeded" (RecursionDepthExceeded raised)
+  - "local_llm_unavailable"    (router RuntimeError)
+  - "rlm_error"                (other unexpected exception)
 
-Phase 1 deep_search_mock remains as alias for API backward compat.
+Phase 1 deep_search_mock is preserved for backward compat (unused by API
+unless ?compat=mock is wired).
 
-Reference: arXiv 2512.24601v2 (Recursive Language Models)
+Reference: arXiv 2512.24601v2 (Recursive Language Models).
 """
 
 from __future__ import annotations
 
 import logging
-import asyncio
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from apps.api.schemas import Citation, SearchRequest, SearchResponse
+from services.rlm_engine.budget import (
+    BudgetExceeded,
+    RecursionDepthExceeded,
+    TokenBudget,
+)
 from services.rlm_engine.repl import RLMSession
+from services.rlm_engine.sub_llm import make_sub_llm
+from services.rlm_engine.trajectory import Trajectory, TrajectoryEvent
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
+_PREFILTER_TOP_K = 8
+_ARTICLES_PER_LAW = 12  # cap per law to keep prompt + budget bounded
 
-_SYSTEM_PROMPT = """You are a Korean legal research assistant operating in a REPL loop.
+# Phase 3 system prompt — instructs root LLM how to use sub_llm + REPL.
+_SYSTEM_PROMPT_V3 = """You are a Korean legal research engine using RLM (Recursive Language Models).
 
-Two data sources are pre-loaded into your namespace. Either may be empty.
+You have a Python REPL with these variables already bound:
+- query: str — the user's question
+- law_texts: dict[str, dict[str, str]] — {law_name: {article_number: content}}
+- sub_llm(prompt, *, max_tokens=512, temperature=0.1) -> str — call a sub-LLM for focused analysis
 
-1) law_texts : dict[str, str]
-   - law_name -> first ~20 articles from the offline legalize-kr corpus.
-   - Empty if the corpus is not mounted on this machine.
+Your job:
+1. Examine `query` and `law_texts`.
+2. For each candidate law, decide if you need a sub_llm call to extract relevant articles.
+3. Sub-LLM calls return strings. If you get "[sub_llm_error] ..." treat it as a soft failure.
+4. Build the final result as a list of dicts in variable FINAL_ANSWER:
+   FINAL_ANSWER = [
+     {"law_id": "...", "law_name": "...", "article": "제N조", "excerpt": "..."},
+     ...
+   ]
 
-2) live_results : dict[str, list[dict]]
-   - Keys: "law", "precedent", "interpretation".
-   - Each list item is {id, name, type, date, url} from law.go.kr.
-   - Empty if LAW_GO_KR_OC is not set or the live fetch failed.
+Constraints:
+- No imports, no file IO, no eval/exec, no dunder access.
+- Max sub_llm depth: 3.
+- Output Python code only — no explanation. The code will be exec()'d.
 
-Your job: write Python that sets FINAL_ANSWER to a list of citation dicts.
-Each citation MUST have: law_id, law_name, article, excerpt.
+IMPORTANT: string slice subscripts (e.g. text[:200]) are REJECTED by the
+sandbox (RestrictedPython does not allow slice keys on strings). Use these
+non-slice idioms instead:
+  - first sentence: text.partition(". ")[0]
+  - first line:     text.splitlines()[0] if text.splitlines() else ""
+  - first chunk:    text.partition(chr(10))[0]
+List slicing (e.g. items[:5]) IS allowed.
 
-Picking source:
-- Statute body / specific clause language  -> law_texts
-- Case law (판례), interpretations         -> live_results["precedent"], live_results["interpretation"]
-- Legal name / metadata only               -> live_results["law"]
-- If both have signal, combine them.
-- If both are empty: FINAL_ANSWER = []   (do NOT fabricate).
-
-Example combining both sources:
-```python
-hits = []
-for name, text in law_texts.items():
-    if "허가" in text or "요건" in text:
-        hits.append({"law_id": "legalize-kr", "law_name": name,
-                     "article": "법률", "excerpt": text[:200]})
-for it in live_results.get("precedent", []):
-    hits.append({"law_id": it["id"], "law_name": it["name"],
-                 "article": "판례", "excerpt": it.get("type", "")})
-FINAL_ANSWER = hits[:5]
-```
-
-Write only valid Python. No imports. Set FINAL_ANSWER before the code ends."""
+Example pattern (do not copy verbatim):
+candidates = []
+for law_name, articles in law_texts.items():
+    if "수소" in law_name or any("수소" in a for a in articles.values()):
+        items = list(articles.items())[:5]                     # list slice OK
+        joined = " | ".join(f"{n}: {c.partition(chr(10))[0]}" for n, c in items)
+        summary = sub_llm("From " + law_name + " articles, list ones relevant to: " + query
+                          + "\\n\\n" + joined, max_tokens=400)
+        excerpt = summary.partition("\\n\\n")[0]               # no string slice
+        candidates.append({"law_id": "unknown", "law_name": law_name,
+                           "article": "제1조", "excerpt": excerpt})
+FINAL_ANSWER = candidates[:5]                                  # list slice OK
+"""
 
 
 @dataclass
 class TrajectoryLog:
+    """Lightweight log preserved for Phase 2 callers (test_rlm_minimal_loop)."""
+
     trajectory_id: str
     query: str
     steps: list[dict[str, Any]] = field(default_factory=list)
     final_answer: Any = None
     error: str | None = None
     elapsed_ms: float = 0.0
-
-
-async def run(
-    query: str,
-    laws: list[str] | None = None,
-) -> TrajectoryLog:
-    """
-    Execute minimal RLM loop for a query.
-
-    Args:
-        query: Natural language legal question.
-        laws: Optional list of law names (folder names from legalize-kr).
-              If None, fast_search pre-filters top-10 relevant laws.
-
-    Returns:
-        TrajectoryLog with final_answer or error.
-    """
-    trajectory_id = str(uuid.uuid4())
-    t0 = time.perf_counter()
-    log = TrajectoryLog(trajectory_id=trajectory_id, query=query)
-
-    # Step 1: resolve law texts
-    law_texts: dict[str, str] = {}
-    if laws:
-        from services.data.legalize_kr import load_law
-
-        for law_name in laws:
-            tree = load_law(law_name)
-            if tree:
-                combined = "\n".join(
-                    f"{a.number}{a.title}: {a.content[:500]}"
-                    for a in tree.articles[:20]  # first 20 articles per law
-                )
-                law_texts[tree.law_name] = combined
-        log.steps.append({"step": "law_load", "count": len(law_texts), "source": "caller"})
-    else:
-        # Pre-filter via grep_search over legalize-kr (offline). Skipped silently
-        # if the corpus is not mounted — live_results below covers that case.
-        try:
-            from services.data.legalize_kr import grep_search, load_law
-
-            grep_result = await grep_search(query, limit=8)
-            for hit in grep_result.hits:
-                tree = load_law(hit.law_name)
-                if not tree or hit.law_name in law_texts:
-                    continue
-                combined = "\n".join(
-                    f"{a.number}{a.title}: {a.content[:500]}"
-                    for a in tree.articles[:20]
-                )
-                law_texts[hit.law_name] = combined
-            log.steps.append(
-                {"step": "law_prefilter", "count": len(law_texts),
-                 "source": "grep_search", "mode": grep_result.mode}
-            )
-        except Exception as exc:
-            logger.warning("grep_search prefilter failed (corpus missing?): %s", exc)
-            log.steps.append({"step": "law_prefilter", "error": str(exc)})
-
-    # Live results from law.go.kr Open API (Option C — hybrid). Fetched in parallel
-    # so the LLM has access to fresh case law / interpretations even when the
-    # offline corpus is missing or stale. Empty {} if OC not configured or
-    # everything fails — the REPL prompt tells the LLM how to handle that.
-    live_results: dict[str, list[dict]] = {"law": [], "precedent": [], "interpretation": []}
-    try:
-        if os.getenv("LAW_GO_KR_OC"):
-            from services.data.law_go_kr import LawGoKrClient
-
-            client = LawGoKrClient()
-            law_items, prec_items, expc_items = await asyncio.gather(
-                client.search_law(query, display=5),
-                client.search_precedent(query, display=5),
-                client.search_interpretation(query, display=3),
-                return_exceptions=True,
-            )
-
-            def _to_dicts(items):
-                if isinstance(items, BaseException) or not items:
-                    return []
-                return [
-                    {
-                        "id": it.item_id,
-                        "name": it.title,
-                        "type": it.subtitle,
-                        "date": it.enforced_at,
-                        "url": it.detail_url,
-                    }
-                    for it in items
-                ]
-
-            live_results = {
-                "law": _to_dicts(law_items),
-                "precedent": _to_dicts(prec_items),
-                "interpretation": _to_dicts(expc_items),
-            }
-            log.steps.append(
-                {
-                    "step": "live_search",
-                    "source": "law.go.kr",
-                    "law": len(live_results["law"]),
-                    "precedent": len(live_results["precedent"]),
-                    "interpretation": len(live_results["interpretation"]),
-                }
-            )
-        else:
-            log.steps.append({"step": "live_search", "skipped": "LAW_GO_KR_OC not set"})
-    except Exception as exc:
-        logger.warning("law.go.kr live fetch failed: %s", exc)
-        log.steps.append({"step": "live_search", "error": str(exc)})
-
-    # Step 2: set up REPL session — both sources injected, either may be empty
-    session = RLMSession()
-    session.load("query", query)
-    session.load("law_texts", law_texts)
-    session.load("live_results", live_results)
-
-    # Step 3-6: LLM → code → exec → FINAL_ANSWER
-    from services.llm import router
-
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Query: {query}\n\n"
-                f"Available laws: {list(law_texts.keys())}\n\n"
-                "Write Python code to set FINAL_ANSWER."
-            ),
-        },
-    ]
-
-    final_answer = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            generated_code = await router.complete(messages, max_tokens=512, temperature=0.1)
-        except RuntimeError as exc:
-            # Local LLM unavailable — surface error, no silent fallback
-            logger.error("LLM unavailable in RLM loop (attempt %d): %s", attempt + 1, exc)
-            log.error = "local_llm_unavailable"
-            log.elapsed_ms = (time.perf_counter() - t0) * 1000
-            return log
-
-        # Extract code block if wrapped in ```python ... ```
-        code = _extract_code(generated_code)
-        log.steps.append({"step": "llm_generate", "attempt": attempt + 1, "code_len": len(code)})
-
-        exec_result = session.exec(code)
-        log.steps.append({"step": "exec", "attempt": attempt + 1, "output": exec_result})
-
-        final_answer = session.get("FINAL_ANSWER")
-        if final_answer is not None:
-            break
-
-        # Feed back error for retry — branch on what actually went wrong so
-        # the LLM gets a useful hint instead of a generic re-prompt.
-        messages.append({"role": "assistant", "content": generated_code})
-        result_str = (exec_result or "").strip()
-        if result_str.startswith(("CompileError:", "SyntaxError:")):
-            hint = (
-                f"Your code did not compile under the sandbox: {result_str}. "
-                "Rewrite without imports, dunder access, or file/network calls. "
-                "Use only plain dict/list operations on law_texts and live_results, "
-                "then set FINAL_ANSWER."
-            )
-        elif result_str.startswith("TimeoutError:"):
-            hint = (
-                f"{result_str}. Your previous code looped too long. "
-                "Avoid while-True or unbounded recursion; iterate over law_texts.items() "
-                "and break early once you have enough citations."
-            )
-        elif result_str.startswith("ExecError:"):
-            hint = (
-                f"Your code raised at runtime: {result_str}. "
-                "Re-check key access (use .get(...)) and types, then set FINAL_ANSWER "
-                "to a list of citation dicts with keys law_id, law_name, article, excerpt."
-            )
-        else:
-            hint = (
-                f"FINAL_ANSWER was not set (exec output: {result_str or 'no output'}). "
-                "You MUST end your code with FINAL_ANSWER = [...] (a list of citation dicts)."
-            )
-        messages.append({"role": "user", "content": hint})
-
-    log.final_answer = final_answer
-    log.elapsed_ms = (time.perf_counter() - t0) * 1000
-    logger.info(
-        "RLM trajectory=%s query=%r steps=%d final_answer_type=%s elapsed_ms=%.0f",
-        trajectory_id,
-        query,
-        len(log.steps),
-        type(final_answer).__name__,
-        log.elapsed_ms,
-    )
-    return log
 
 
 def _extract_code(text: str) -> str:
@@ -297,12 +126,366 @@ def _extract_code(text: str) -> str:
     return text.strip()
 
 
+def _resolve_law_texts(
+    query: str,
+    laws: list[str] | None,
+    log: TrajectoryLog,
+    traj: Trajectory,
+) -> dict[str, dict[str, str]]:
+    """
+    Build {law_name: {article_number: content}}.
+
+    Priority:
+      - explicit `laws` list → load via legalize_kr.load_law()
+      - else: fast_search prefilter (ChromaDB) → load top-K via load_law()
+      - fallback (no fast_search hit): single doc text from prefilter, keyed
+        as "전문" (full text) so the root LLM still sees something.
+    """
+    law_texts: dict[str, dict[str, str]] = {}
+
+    # --- explicit laws list ---
+    if laws:
+        from services.data.legalize_kr import load_law
+
+        for law_name in laws:
+            tree = load_law(law_name)
+            if not tree:
+                continue
+            articles = {
+                a.number: (a.content[:1000])
+                for a in tree.articles[:_ARTICLES_PER_LAW]
+            }
+            law_texts[tree.law_name] = articles
+            traj.append(
+                TrajectoryEvent.new(
+                    kind="law_load",
+                    depth=0,
+                    payload={
+                        "source": "caller",
+                        "law_name": tree.law_name,
+                        "law_id": tree.law_id,
+                        "articles": len(articles),
+                    },
+                )
+            )
+        log.steps.append(
+            {"step": "law_load", "count": len(law_texts), "source": "caller"}
+        )
+        return law_texts
+
+    # --- fast_search prefilter ---
+    try:
+        from services.data.legalize_kr import load_law
+        from services.fast_search.search import _get_collection
+
+        collection = _get_collection()
+        results = collection.query(query_texts=[query], n_results=_PREFILTER_TOP_K)
+        metas = results.get("metadatas", [[]])[0]
+        docs = results.get("documents", [[]])[0]
+
+        # Dedupe by law_name; pick first hit per law to drive load_law().
+        seen: set[str] = set()
+        for meta, doc in zip(metas, docs):
+            if not meta:
+                continue
+            display_name = meta.get("law_name", "")
+            folder_name = meta.get("law_folder") or display_name
+            if not display_name or display_name in seen:
+                # No metadata law_name: fall back to inline doc.
+                if not display_name:
+                    inline_key = "unnamed_" + str(len(law_texts))
+                    if inline_key not in law_texts:
+                        law_texts[inline_key] = {"전문": (doc or "")[:1000]}
+                continue
+            seen.add(display_name)
+            tree = load_law(folder_name) if folder_name else None
+            if tree:
+                articles = {
+                    a.number: (a.content[:1000])
+                    for a in tree.articles[:_ARTICLES_PER_LAW]
+                }
+                law_texts[tree.law_name] = articles
+                traj.append(
+                    TrajectoryEvent.new(
+                        kind="law_load",
+                        depth=0,
+                        payload={
+                            "source": "fast_search",
+                            "law_name": tree.law_name,
+                            "law_id": tree.law_id,
+                            "articles": len(articles),
+                        },
+                    )
+                )
+            else:
+                # legalize_kr couldn't resolve folder — use the chroma doc snippet.
+                law_texts[display_name] = {"전문": (doc or "")[:1000]}
+                traj.append(
+                    TrajectoryEvent.new(
+                        kind="law_load",
+                        depth=0,
+                        payload={
+                            "source": "fast_search_inline",
+                            "law_name": display_name,
+                            "articles": 1,
+                        },
+                    )
+                )
+
+        log.steps.append(
+            {"step": "law_prefilter", "count": len(law_texts), "source": "fast_search"}
+        )
+    except Exception as exc:  # noqa: BLE001 — prefilter is best-effort
+        logger.warning("fast_search prefilter failed: %s", exc)
+        log.steps.append({"step": "law_prefilter", "error": str(exc)})
+
+    return law_texts
+
+
+async def run(
+    query: str,
+    laws: list[str] | None = None,
+) -> TrajectoryLog:
+    """
+    Execute the Phase 3 RLM loop. Returns a TrajectoryLog (legacy shape) so
+    Phase 2 tests keep working; rich audit lives on a side Trajectory which
+    `deep_search()` persists when KOLAW_PERSIST_TRAJECTORY=1.
+    """
+    trajectory_id = str(uuid.uuid4())
+    t0 = time.perf_counter()
+    log = TrajectoryLog(trajectory_id=trajectory_id, query=query)
+
+    traj = Trajectory.new(query=query)
+    # Use the same id on both records so callers can correlate.
+    traj.trajectory_id = trajectory_id
+    budget = TokenBudget()
+
+    # 1+2: resolve laws → law_texts
+    law_texts = _resolve_law_texts(query, laws, log, traj)
+
+    # 3: REPL session + injected sub_llm
+    session = RLMSession()
+    session.load("query", query)
+    session.load("law_texts", law_texts)
+
+    # Root prompt event (recorded BEFORE LLM call for accurate parent linkage).
+    root_prompt_event = TrajectoryEvent.new(
+        kind="root_prompt",
+        depth=0,
+        payload={
+            "query": query,
+            "law_count": len(law_texts),
+            "system_prompt_chars": len(_SYSTEM_PROMPT_V3),
+        },
+    )
+    traj.append(root_prompt_event)
+
+    # 4: LLM call(s) — retry on missing FINAL_ANSWER
+    from services.llm import router
+
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": _SYSTEM_PROMPT_V3},
+        {
+            "role": "user",
+            "content": (
+                f"Query: {query}\n\n"
+                f"Available laws ({len(law_texts)}): "
+                f"{list(law_texts.keys())}\n\n"
+                "Write Python code that sets FINAL_ANSWER (no explanation)."
+            ),
+        },
+    ]
+
+    final_answer: Any = None
+    last_root_completion_event: TrajectoryEvent | None = None
+    last_exec_error: str | None = None
+
+    for attempt in range(MAX_RETRIES):
+        # --- root LLM call ---
+        try:
+            generated_code = await router.complete(
+                messages, max_tokens=1024, temperature=0.1
+            )
+        except RuntimeError as exc:
+            logger.error(
+                "LLM unavailable (attempt %d/%d): %s",
+                attempt + 1,
+                MAX_RETRIES,
+                exc,
+            )
+            log.error = "local_llm_unavailable"
+            log.elapsed_ms = (time.perf_counter() - t0) * 1000
+            traj.error = "local_llm_unavailable"
+            traj.elapsed_ms = log.elapsed_ms
+            _maybe_persist(traj)
+            return log
+        except Exception as exc:  # noqa: BLE001 — surface broad failures cleanly
+            logger.exception("Unexpected router error: %s", exc)
+            log.error = "rlm_error"
+            log.elapsed_ms = (time.perf_counter() - t0) * 1000
+            traj.error = f"rlm_error: {type(exc).__name__}: {str(exc)[:200]}"
+            traj.elapsed_ms = log.elapsed_ms
+            _maybe_persist(traj)
+            return log
+
+        code = _extract_code(generated_code)
+        completion_event = TrajectoryEvent.new(
+            kind="root_completion",
+            depth=0,
+            parent_event_id=root_prompt_event.event_id,
+            payload={
+                "attempt": attempt + 1,
+                "code_chars": len(code),
+                "raw_chars": len(generated_code),
+            },
+            tokens_out=max(1, len(generated_code) // 4),
+        )
+        traj.append(completion_event)
+        last_root_completion_event = completion_event
+        log.steps.append(
+            {"step": "llm_generate", "attempt": attempt + 1, "code_len": len(code)}
+        )
+
+        # --- inject a fresh sub_llm bound to THIS root completion as parent ---
+        # depth=0 parent → sub_llm runs at depth=1.
+        try:
+            session.inject_callable(
+                "sub_llm",
+                make_sub_llm(
+                    trajectory=traj,
+                    budget=budget,
+                    parent_depth=0,
+                    parent_event_id=completion_event.event_id,
+                    timeout_s=30.0,
+                ),
+            )
+        except BudgetExceeded as exc:
+            log.error = "budget_exceeded"
+            traj.error = f"budget_exceeded: {exc}"
+            break
+        except RecursionDepthExceeded as exc:
+            log.error = "recursion_depth_exceeded"
+            traj.error = f"recursion_depth_exceeded: {exc}"
+            break
+
+        # --- exec sandboxed code ---
+        try:
+            exec_result = session.exec(code)
+        except BudgetExceeded as exc:
+            log.error = "budget_exceeded"
+            traj.error = f"budget_exceeded: {exc}"
+            break
+        except RecursionDepthExceeded as exc:
+            log.error = "recursion_depth_exceeded"
+            traj.error = f"recursion_depth_exceeded: {exc}"
+            break
+        except Exception as exc:  # noqa: BLE001
+            log.error = "rlm_error"
+            traj.error = f"rlm_error: {type(exc).__name__}: {str(exc)[:200]}"
+            break
+
+        # exec_result is SandboxResult (Phase 3); fall back gracefully.
+        exec_error = getattr(exec_result, "error", None)
+        exec_stdout = getattr(exec_result, "stdout", "")
+        last_exec_error = exec_error
+
+        traj.append(
+            TrajectoryEvent.new(
+                kind="repl_exec_error" if exec_error else "repl_exec",
+                depth=0,
+                parent_event_id=completion_event.event_id,
+                payload={
+                    "attempt": attempt + 1,
+                    "error": exec_error,
+                    "stdout_chars": len(exec_stdout),
+                    "timed_out": getattr(exec_result, "timed_out", False),
+                },
+            )
+        )
+        log.steps.append(
+            {
+                "step": "exec",
+                "attempt": attempt + 1,
+                "output": exec_error or exec_stdout[:200],
+            }
+        )
+
+        final_answer = session.get("FINAL_ANSWER")
+        if final_answer is not None:
+            break
+
+        # Retry: feed back the exec error so the LLM can fix the code.
+        messages.append({"role": "assistant", "content": generated_code})
+        retry_hint = (
+            f"FINAL_ANSWER was not set. Sandbox said: {exec_error or '(no error)'}.\n"
+            "Rewrite the snippet, set FINAL_ANSWER as a list of dicts, "
+            "and output Python only."
+        )
+        messages.append({"role": "user", "content": retry_hint})
+
+    # Translate per-attempt structured errors into the legacy log.error.
+    # (BudgetExceeded etc. set log.error inside the loop and `break`.)
+
+    log.final_answer = final_answer
+
+    if log.error is None and final_answer is None and last_exec_error:
+        # All retries used and FINAL_ANSWER never set. Surface as rlm_error
+        # rather than silently returning empty, per Phase 3 contract.
+        log.error = "rlm_error"
+        traj.error = f"rlm_error: FINAL_ANSWER never set; last exec_error={last_exec_error[:200]}"
+
+    # 5: final_answer event
+    traj.final_answer = final_answer
+    traj.append(
+        TrajectoryEvent.new(
+            kind="final_answer",
+            depth=0,
+            parent_event_id=(
+                last_root_completion_event.event_id
+                if last_root_completion_event
+                else root_prompt_event.event_id
+            ),
+            payload={
+                "type": type(final_answer).__name__,
+                "count": (len(final_answer) if isinstance(final_answer, list) else 0),
+                "error": log.error,
+            },
+        )
+    )
+
+    log.elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    traj.elapsed_ms = log.elapsed_ms
+
+    _maybe_persist(traj)
+
+    logger.info(
+        "RLM trajectory=%s query=%r events=%d final_answer_type=%s elapsed_ms=%.0f error=%s",
+        trajectory_id,
+        query,
+        len(traj.events),
+        type(final_answer).__name__,
+        log.elapsed_ms,
+        log.error,
+    )
+    return log
+
+
+def _maybe_persist(traj: Trajectory) -> None:
+    """Persist trajectory JSON when KOLAW_PERSIST_TRAJECTORY=1."""
+    if os.getenv("KOLAW_PERSIST_TRAJECTORY", "0") != "1":
+        return
+    try:
+        target = Path.home() / ".kolaw" / "trajectories"
+        traj.persist(dir=target)
+    except Exception as exc:  # noqa: BLE001 — persistence is best-effort
+        logger.warning("trajectory persist failed: %s", exc)
+
+
 def _trajectory_to_response(
     log: TrajectoryLog, req: SearchRequest
 ) -> SearchResponse:
     """Convert TrajectoryLog to SearchResponse for the API."""
     if log.error:
-        # Degradation: surface error, never silent fallback
         return SearchResponse(
             verdict=None,
             confidence=0.0,
@@ -324,11 +507,10 @@ def _trajectory_to_response(
                         article=item.get("article", ""),
                         version=item.get("version", ""),
                         excerpt=str(item.get("excerpt", ""))[:300],
-                        source="lawxref",
                     )
                 )
 
-    verdict = "ambiguous"
+    verdict: str = "ambiguous"
     confidence = 0.5
     if citations:
         verdict = "applies"
@@ -338,7 +520,7 @@ def _trajectory_to_response(
         confidence = 0.3
 
     return SearchResponse(
-        verdict=verdict,
+        verdict=verdict,  # type: ignore[arg-type]
         confidence=confidence,
         citations=citations,
         trajectory_id=log.trajectory_id,
@@ -346,86 +528,14 @@ def _trajectory_to_response(
     )
 
 
-async def _pageindex_citations(query: str) -> list[Citation]:
-    """
-    Run PageIndex layer if a known law name is detected in the query.
-    Returns citations tagged source='pageindex'. Empty list on any failure
-    (no tree mapped, navigator empty, file missing) — caller treats as
-    "no PageIndex contribution; fall back to RLM-only result".
-
-    PageIndex tree JSONs live in y-company; path via PAGEINDEX_TREES_DIR env.
-    """
-    try:
-        from services.pageindex.loader import detect_law_name
-        from services.pageindex.retriever import pageindex_retrieve
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("PageIndex import failed: %s", exc)
-        return []
-
-    law_name = detect_law_name(query)
-    if not law_name:
-        return []
-
-    try:
-        result = await pageindex_retrieve(law_name, query, char_budget=8000)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("PageIndex retrieve raised: %s", exc)
-        return []
-
-    if not result.tree_available or not result.articles:
-        return []
-
-    citations: list[Citation] = []
-    for art in result.articles[:5]:
-        citations.append(
-            Citation(
-                law_id=f"pageindex:{art.parent_id}",
-                law_name=law_name,
-                article=art.node_id or art.title,
-                version="",  # PageIndex trees do not carry 시행일자
-                excerpt=(art.body or art.title)[:280],
-                source="pageindex",
-            )
-        )
-    return citations
-
-
 async def deep_search(req: SearchRequest) -> SearchResponse:
     """
-    Phase 2 deep search via minimal RLM loop, optionally merged with PageIndex.
-
-    PageIndex layer (Buildy 2026-05-07, 의장 결재 옵션 B):
-      If query mentions a law mapped in services.pageindex.loader.TREE_FILENAMES,
-      run hierarchical tree navigation in parallel with the RLM loop and merge
-      the resulting article citations (tagged source='pageindex') into the
-      response. PageIndex failures are silent — RLM result still returned.
-
-    On local LLM unavailable: returns 503-equivalent response with error field.
+    Phase 3 deep search via RLM loop with Trajectory + Budget + sub_llm.
+    On failure: returns SearchResponse.error one of
+    {budget_exceeded, recursion_depth_exceeded, local_llm_unavailable, rlm_error}.
     """
-    import asyncio as _asyncio
-
-    log_task = _asyncio.create_task(run(query=req.query, laws=req.laws or None))
-    pi_task = _asyncio.create_task(_pageindex_citations(req.query))
-
-    log = await log_task
-    pi_citations = await pi_task
-
-    response = _trajectory_to_response(log, req)
-    if pi_citations:
-        # Merge PageIndex hits at the front (cross-cut context first).
-        # Always merge, even when RLM errored — PageIndex is an independent
-        # retrieval layer; lawxref(rag) on caller side still benefits.
-        merged = pi_citations + list(response.citations)
-        update: dict = {"citations": merged[:10]}
-        if response.error == "local_llm_unavailable":
-            # RLM failed but PageIndex succeeded — clear error so caller
-            # treats this as a partial success (PageIndex-only deep result).
-            # The 'source' field on each citation distinguishes the layer.
-            update["error"] = None
-            update["verdict"] = "ambiguous"
-            update["confidence"] = 0.5
-        response = response.model_copy(update=update)
-    return response
+    log = await run(query=req.query, laws=req.laws or None)
+    return _trajectory_to_response(log, req)
 
 
 async def deep_search_mock(req: SearchRequest) -> SearchResponse:
