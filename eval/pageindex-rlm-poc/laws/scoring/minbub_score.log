@@ -1,0 +1,49 @@
+
+=== minbub (민법) ===
+  -> minbub Q1 kolaw...
+     sum=29 kw=0.8 art=0.67
+  -> minbub Q1 pageindex...
+     sum=32 kw=0.8 art=0.0
+  -> minbub Q2 kolaw...
+     sum=23 kw=1.0 art=0.0
+  -> minbub Q2 pageindex...
+     sum=35 kw=1.0 art=0.0
+  -> minbub Q3 kolaw...
+     sum=32 kw=0.5 art=0.0
+  -> minbub Q3 pageindex...
+     sum=39 kw=1.0 art=1.0
+  -> minbub Q4 kolaw...
+     sum=20 kw=0.25 art=0.0
+  -> minbub Q4 pageindex...
+     sum=32 kw=0.5 art=0.0
+  -> minbub Q5 kolaw...
+     sum=27 kw=1.0 art=0.0
+  -> minbub Q5 pageindex...
+     sum=39 kw=1.0 art=0.0
+
+=== Aggregate ===
+{
+  "per_law": {
+    "minbub": {
+      "display": "민법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 26.2,
+      "pi_avg_sum": 35.4,
+      "kolaw_kw_avg": 0.71,
+      "pi_kw_avg": 0.86,
+      "kolaw_art_avg": 0.13,
+      "pi_art_avg": 0.2,
+      "delta_sum": 9.2
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 26.2,
+    "pi_avg_sum": 35.4,
+    "kolaw_kw_avg": 0.71,
+    "pi_kw_avg": 0.86,
+    "kolaw_art_avg": 0.13,
+    "pi_art_avg": 0.2,
+    "delta_sum": 9.2
+  }
+}

@@ -1,0 +1,333 @@
+민법 (multi-source)
+  법률
+    [law] 민법
+    [law] 제1편 총칙
+      [chapter] 제1장 통칙
+        [article] 제1조 (법원)
+        [article] 제2조 (신의성실)
+      [chapter] 제2장 인
+        [section] 제1절 능력
+        [section] 제2절 주소
+        [section] 제3절 부재와 실종
+      [chapter] 제3장 법인
+        [section] 제1절 총칙
+        [section] 제2절 설립
+        [section] 제3절 기관
+        [section] 제4절 해산
+        [section] 제5절 벌칙
+      [chapter] 제4장 물건
+        [article] 제98조 (물건의 정의)
+        [article] 제99조 (부동산, 동산)
+        [article] 제100조 (주물, 종물)
+        [article] 제101조 (천연과실, 법정과실)
+        [article] 제102조 (과실의 취득)
+      [chapter] 제5장 법률행위
+        [section] 제1절 총칙
+        [section] 제2절 의사표시
+        [section] 제3절 대리
+        [section] 제4절 무효와 취소
+        [section] 제5절 조건과 기한
+      [chapter] 제6장 기간
+        [article] 제155조 (본장의 적용범위)
+        [article] 제156조 (기간의 기산점)
+        [article] 제157조 (기간의 기산점)
+        [article] 제158조 (나이의 계산과 표시)
+        [article] 제159조 (기간의 만료점)
+        [article] 제160조 (역에 의한 계산)
+        [article] 제161조 (공휴일 등과 기간의 만료점)
+      [chapter] 제7장 소멸시효
+        [article] 제162조 (채권, 재산권의 소멸시효)
+        [article] 제163조 (3년의 단기소멸시효)
+        [article] 제164조 (1년의 단기소멸시효)
+        [article] 제165조 (판결 등에 의하여 확정된 채권의 소멸시효)
+        [article] 제166조 (소멸시효의 기산점)
+        [article] 제167조 (소멸시효의 소급효)
+        [article] 제168조 (소멸시효의 중단사유)
+        [article] 제169조 (시효중단의 효력)
+        [article] 제170조 (재판상의 청구와 시효중단)
+        [article] 제171조 (파산절차참가와 시효중단)
+        [article] 제172조 (지급명령과 시효중단)
+        [article] 제173조 (화해를 위한 소환, 임의출석과 시효중단)
+        [article] 제174조 (최고와 시효중단)
+        [article] 제175조 (압류, 가압류, 가처분과 시효중단)
+        [article] 제176조 (압류, 가압류, 가처분과 시효중단)
+        [article] 제177조 (승인과 시효중단)
+        [article] 제178조 (중단후에 시효진행)
+        [article] 제179조 (제한능력자의 시효정지)
+        [article] 제180조 (재산관리자에 대한 제한능력자의 권리, 부부 사이의 권리와 시효정지)
+        [article] 제181조 (상속재산에 관한 권리와 시효정지)
+        [article] 제182조 (천재 기타 사변과 시효정지)
+        [article] 제183조 (종속된 권리에 대한 소멸시효의 효력)
+        [article] 제184조 (시효의 이익의 포기 기타)
+    [law] 제2편 물권
+      [chapter] 제1장 총칙
+        [article] 제185조 (물권의 종류)
+        [article] 제186조 (부동산물권변동의 효력)
+        [article] 제187조 (등기를 요하지 아니하는 부동산물권취득)
+        [article] 제188조 (동산물권양도의 효력, 간이인도)
+        [article] 제189조 (점유개정)
+        [article] 제190조 (목적물반환청구권의 양도)
+        [article] 제191조 (혼동으로 인한 물권의 소멸)
+      [chapter] 제2장 점유권
+        [article] 제192조 (점유권의 취득과 소멸)
+        [article] 제193조 (상속으로 인한 점유권의 이전)
+        [article] 제194조 (간접점유)
+        [article] 제195조 (점유보조자)
+        [article] 제196조 (점유권의 양도)
+        [article] 제197조 (점유의 태양)
+        [article] 제198조 (점유계속의 추정)
+        [article] 제199조 (점유의 승계의 주장과 그 효과)
+        [article] 제200조 (권리의 적법의 추정)
+        [article] 제201조 (점유자와 과실)
+        [article] 제202조 (점유자의 회복자에 대한 책임)
+        [article] 제203조 (점유자의 상환청구권)
+        [article] 제204조 (점유의 회수)
+        [article] 제205조 (점유의 보유)
+        [article] 제206조 (점유의 보전)
+        [article] 제207조 (간접점유의 보호)
+        [article] 제208조 (점유의 소와 본권의 소와의 관계)
+        [article] 제209조 (자력구제)
+        [article] 제210조 (준점유)
+      [chapter] 제3장 소유권
+        [section] 제1절 소유권의 한계
+        [section] 제2절 소유권의 취득
+        [section] 제3절 공동소유
+      [chapter] 제4장 지상권
+        [article] 제279조 (지상권의 내용)
+        [article] 제280조 (존속기간을 약정한 지상권)
+        [article] 제281조 (존속기간을 약정하지 아니한 지상권)
+        [article] 제282조 (지상권의 양도, 임대)
+        [article] 제283조 (지상권자의 갱신청구권, 매수청구권)
+        [article] 제284조 (갱신과 존속기간)
+        [article] 제285조 (수거의무, 매수청구권)
+        [article] 제286조 (지료증감청구권)
+        [article] 제287조 (지상권소멸청구권)
+        [article] 제288조 (지상권소멸청구와 저당권자에 대한 통지)
+        [article] 제289조 (강행규정)
+        [article] 제289조의2 (구분지상권)
+        [article] 제290조 (준용규정)
+      [chapter] 제5장 지역권
+        [article] 제291조 (지역권의 내용)
+        [article] 제292조 (부종성)
+        [article] 제293조 (공유관계, 일부양도와 불가분성)
+        [article] 제294조 (지역권취득기간)
+        [article] 제295조 (취득과 불가분성)
+        [article] 제296조 (소멸시효의 중단, 정지와 불가분성)
+        [article] 제297조 (용수지역권)
+        [article] 제298조 (승역지소유자의 의무와 승계)
+        [article] 제299조 (위기에 의한 부담면제)
+        [article] 제300조 (공작물의 공동사용)
+        [article] 제301조 (준용규정)
+        [article] 제302조 (특수지역권)
+      [chapter] 제6장 전세권
+        [article] 제303조 (전세권의 내용)
+        [article] 제304조 (건물의 전세권, 지상권, 임차권에 대한 효력)
+        [article] 제305조 (건물의 전세권과 법정지상권)
+        [article] 제306조 (전세권의 양도, 임대 등)
+        [article] 제307조 (전세권양도의 효력)
+        [article] 제308조 (전전세 등의 경우의 책임)
+        [article] 제309조 (전세권자의 유지, 수선의무)
+        [article] 제310조 (전세권자의 상환청구권)
+        [article] 제311조 (전세권의 소멸청구)
+        [article] 제312조 (전세권의 존속기간)
+        [article] 제312조의2 (전세금 증감청구권)
+        [article] 제313조 (전세권의 소멸통고)
+        [article] 제314조 (불가항력으로 인한 멸실)
+        [article] 제315조 (전세권자의 손해배상책임)
+        [article] 제316조 (원상회복의무, 매수청구권)
+        [article] 제317조 (전세권의 소멸과 동시이행)
+        [article] 제318조 (전세권자의 경매청구권)
+        [article] 제319조 (준용규정)
+      [chapter] 제7장 유치권
+        [article] 제320조 (유치권의 내용)
+        [article] 제321조 (유치권의 불가분성)
+        [article] 제322조 (경매, 간이변제충당)
+        [article] 제323조 (과실수취권)
+        [article] 제324조 (유치권자의 선관의무)
+        [article] 제325조 (유치권자의 상환청구권)
+        [article] 제326조 (피담보채권의 소멸시효)
+        [article] 제327조 (타담보제공과 유치권소멸)
+        [article] 제328조 (점유상실과 유치권소멸)
+      [chapter] 제8장 질권
+        [section] 제1절 동산질권
+        [section] 제2절 권리질권
+      [chapter] 제9장 저당권
+        [article] 제356조 (저당권의 내용)
+        [article] 제357조 (근저당)
+        [article] 제358조 (저당권의 효력의 범위)
+        [article] 제359조 (과실에 대한 효력)
+        [article] 제360조 (피담보채권의 범위)
+        [article] 제361조 (저당권의 처분제한)
+        [article] 제362조 (저당물의 보충)
+        [article] 제363조 (저당권자의 경매청구권, 경매인)
+        [article] 제364조 (제삼취득자의 변제)
+        [article] 제365조 (저당지상의 건물에 대한 경매청구권)
+        [article] 제366조 (법정지상권)
+        [article] 제367조 (제삼취득자의 비용상환청구권)
+        [article] 제368조 (공동저당과 대가의 배당, 차순위자의 대위)
+        [article] 제369조 (부종성)
+        [article] 제370조 (준용규정)
+        [article] 제371조 (지상권, 전세권을 목적으로 하는 저당권)
+        [article] 제372조 (타법률에 의한 저당권)
+    [law] 제3편 채권
+      [chapter] 제1장 총칙
+        [section] 제1절 채권의 목적
+        [section] 제2절 채권의 효력
+        [section] 제3절 수인의 채권자 및 채무자
+        [section] 제4절 채권의 양도
+        [section] 제5절 채무의 인수
+        [section] 제6절 채권의 소멸
+        [section] 제7절 지시채권
+        [section] 제8절 무기명채권
+      [chapter] 제2장 계약
+        [section] 제1절 총칙
+        [section] 제2절 증여
+        [section] 제3절 매매
+        [section] 제4절 교환
+        [section] 제5절 소비대차
+        [section] 제6절 사용대차
+        [section] 제7절 임대차
+        [section] 제8절 고용
+        [section] 제9절 도급
+        [section] 제9절의2 여행계약 <신설 2015.2.3>
+        [section] 제10절 현상광고
+        [section] 제11절 위임
+        [section] 제12절 임치
+        [section] 제13절 조합
+        [section] 제14절 종신정기금
+        [section] 제15절 화해
+      [chapter] 제3장 사무관리
+        [article] 제734조 (사무관리의 내용)
+        [article] 제735조 (긴급사무관리)
+        [article] 제736조 (관리자의 통지의무)
+        [article] 제737조 (관리자의 관리계속의무)
+        [article] 제738조 (준용규정)
+        [article] 제739조 (관리자의 비용상환청구권)
+        [article] 제740조 (관리자의 무과실손해보상청구권)
+      [chapter] 제4장 부당이득
+        [article] 제741조 (부당이득의 내용)
+        [article] 제742조 (비채변제)
+        [article] 제743조 (기한전의 변제)
+        [article] 제744조 (도의관념에 적합한 비채변제)
+        [article] 제745조 (타인의 채무의 변제)
+        [article] 제746조 (불법원인급여)
+        [article] 제747조 (원물반환불능한 경우와 가액반환, 전득자의 책임)
+        [article] 제748조 (수익자의 반환범위)
+        [article] 제749조 (수익자의 악의인정)
+      [chapter] 제5장 불법행위
+        [article] 제750조 (불법행위의 내용)
+        [article] 제751조 (재산 이외의 손해의 배상)
+        [article] 제752조 (생명침해로 인한 위자료)
+        [article] 제753조 (미성년자의 책임능력)
+        [article] 제754조 (심신상실자의 책임능력)
+        [article] 제755조 (감독자의 책임)
+        [article] 제756조 (사용자의 배상책임)
+        [article] 제757조 (도급인의 책임)
+        [article] 제758조 (공작물등의 점유자, 소유자의 책임)
+        [article] 제759조 (동물의 점유자의 책임)
+        [article] 제760조 (공동불법행위자의 책임)
+        [article] 제761조 (정당방위, 긴급피난)
+        [article] 제762조 (손해배상청구권에 있어서의 태아의 지위)
+        [article] 제763조 (준용규정)
+        [article] 제764조 (명예훼손의 경우의 특칙)
+        [article] 제765조 (배상액의 경감청구)
+        [article] 제766조 (손해배상청구권의 소멸시효)
+    [law] 제4편 친족
+      [chapter] 제1장 총칙
+        [article] 제767조 (친족의 정의)
+        [article] 제768조 (혈족의 정의)
+        [article] 제769조 (인척의 계원)
+        [article] 제770조 (혈족의 촌수의 계산)
+        [article] 제771조 (인척의 촌수의 계산)
+        [article] 제772조 (양자와의 친계와 촌수)
+        [article] 제773조
+        [article] 제774조
+        [article] 제775조 (인척관계 등의 소멸)
+        [article] 제776조 (입양으로 인한 친족관계의 소멸)
+        [article] 제777조 (친족의 범위)
+      [chapter] 제2장 가족의 범위와 자의 성과 본 <개정 2005.3.31>
+        [article] 제778조
+        [article] 제779조 (가족의 범위)
+        [article] 제780조
+        [article] 제781조 (자의 성과 본)
+        [article] 제782조
+        [article] 제783조
+        [article] 제784조
+        [article] 제785조
+        [article] 제786조
+        [article] 제787조
+        [article] 제788조
+        [article] 제789조
+        [article] 제790조
+        [article] 제791조
+        [article] 제792조
+        [article] 제793조
+        [article] 제794조
+        [article] 제795조
+        [article] 제796조
+        [article] 제797조
+        [article] 제798조
+        [article] 제799조
+      [chapter] 제3장 혼인
+        [section] 제1절 약혼
+        [section] 제2절 혼인의 성립
+        [section] 제3절 혼인의 무효와 취소
+        [section] 제4절 혼인의 효력
+        [section] 제5절 이혼
+      [chapter] 제4장 부모와 자
+        [section] 제1절 친생자
+        [section] 제2절 양자(養子) <개정 2012.2.10>
+        [section] 제3절 친권
+      [chapter] 제5장 후견
+        [section] 제1절 미성년후견과 성년후견 <개정 2011.3.7>
+        [section] 제2절 한정후견과 특정후견 <신설 2011.3.7>
+        [section] 제3절 후견계약 <신설 2011.3.7>
+      [chapter] 제6장 삭제 <2011.3.7>
+        [article] 제960조
+        [article] 제961조
+        [article] 제962조
+        [article] 제963조
+        [article] 제964조
+        [article] 제965조
+        [article] 제966조
+        [article] 제967조
+        [article] 제968조
+        [article] 제969조
+        [article] 제970조
+        [article] 제971조
+        [article] 제972조
+        [article] 제973조
+      [chapter] 제7장 부양
+        [article] 제974조 (부양의무)
+        [article] 제975조 (부양의무와 생활능력)
+        [article] 제976조 (부양의 순위)
+        [article] 제977조 (부양의 정도, 방법)
+        [article] 제978조 (부양관계의 변경 또는 취소)
+        [article] 제979조 (부양청구권처분의 금지)
+      [chapter] 제8장 삭제 <2005.3.31>
+        [section] 제1절 삭제 <2005.3.31>
+        [section] 제2절 삭제 <2005.3.31>
+        [section] 제3절 삭제 <2005.3.31>
+    [law] 제5편 상속 <개정 1990.1.13>
+      [chapter] 제1장 상속 <신설 1990.1.13>
+        [section] 제1절 총칙 <개정 1990.1.13>
+        [section] 제2절 상속인 <개정 1990.1.13>
+        [section] 제3절 상속의 효력 <개정 1990.1.13>
+        [section] 제4절 상속의 승인 및 포기 <개정 1990.1.13>
+        [section] 제5절 재산의 분리
+        [section] 제6절 상속인의 부존재 <개정 1990.1.13>
+      [chapter] 제2장 유언
+        [section] 제1절 총칙
+        [section] 제2절 유언의 방식
+        [section] 제3절 유언의 효력
+        [section] 제4절 유언의 집행
+        [section] 제5절 유언의 철회
+      [chapter] 제3장 유류분 <개정 1990.1.13>
+        [article] 제1112조 (유류분의 권리자와 유류분)
+        [article] 제1113조 (유류분의 산정)
+        [article] 제1114조 (산입될 증여)
+        [article] 제1115조 (유류분의 보전)
+        [article] 제1116조 (반환의 순서)
+        [article] 제1117조 (소멸시효)
+        [article] 제1118조 (준용규정)
+      [chapter] 부칙

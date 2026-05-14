@@ -1,0 +1,15 @@
+{
+  "per_law": [
+    {
+      "name_id": "jabonsijang",
+      "kolaw_calls": 5,
+      "kolaw_lat_ms": 90366,
+      "pi_calls": 5,
+      "pi_lat_ms": 1018571,
+      "pi_total_cycles": 12,
+      "pi_in_tokens": 57004,
+      "pi_out_tokens": 5285
+    }
+  ],
+  "wall_time_s": 1108.9
+}

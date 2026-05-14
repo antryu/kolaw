@@ -1,0 +1,29 @@
+
+=== jabonsijang (자본시장과금융투자업에관한법률) ===
+  -> Q1: 자본시장법상 공시 의무 (정기·수시) 는?
+     [kolaw_baseline]
+       cands=8 lat=16447ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=1 lat=163811ms in=9500 out=809
+  -> Q2: 내부자거래 금지와 처벌은?
+     [kolaw_baseline]
+       cands=8 lat=14577ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=2 lat=168666ms in=7942 out=599
+  -> Q3: 시세조종 금지 행위 유형은?
+     [kolaw_baseline]
+       cands=8 lat=26098ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=235862ms in=5804 out=760
+  -> Q4: 금융투자업 인가 종류와 자기자본 요건은?
+     [kolaw_baseline]
+       cands=8 lat=19430ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=212278ms in=17439 out=1406
+  -> Q5: 과징금 부과 대상과 산정 방식은?
+     [kolaw_baseline]
+       cands=8 lat=13814ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=237954ms in=16319 out=1711
+
+Wrote /Users/andrew/PRJs/kolaw/eval/pageindex-rlm-poc/laws/answers/summary_cost_jabonsijang.json (wall 1108.9s)

@@ -1,0 +1,231 @@
+[
+  {
+    "name_id": "hyungbub",
+    "qid": "Q1",
+    "question": "사기죄의 구성요건과 형량은?",
+    "kolaw_baseline": {
+      "accuracy": 7,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "발췌 한계를 정직히 인정한 적절한 답변이나, 부연 설명의 '2천만원 이하 벌금'은 구 형법 기준(개정 전)으로 검증 필요",
+      "sum": 33,
+      "keyword_hits": [
+        "사기",
+        "기망",
+        "10년",
+        "이하",
+        "징역",
+        "벌금",
+        "재산상",
+        "이익"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 18874,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 7,
+      "comment": "개정 형량(20년/5천만원) 정확 반영, 관련 범죄 비교표 유용하나 '비판 반영' 섹션은 맥락 외 군더더기",
+      "sum": 34,
+      "keyword_hits": [
+        "사기",
+        "기망",
+        "10년",
+        "이하",
+        "징역",
+        "벌금",
+        "재산상",
+        "이익"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 16652,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "hyungbub",
+    "qid": "Q2",
+    "question": "공소시효는 형의 종류별로 어떻게 다른가?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "발췌 범위 한계를 솔직히 인정하고 형사소송법 §249 참조처를 정확히 안내했으나, 질문의 핵심(사형 25년/무기 15년/장기 10년 이상은 15년 등) 미응답; ground truth '형법 제249조'는 살인죄 조문으로 오기 — 공소시효는 형사소송법 제249조임",
+      "sum": 28,
+      "keyword_hits": [
+        "공소시효"
+      ],
+      "keyword_hit_rate": 0.17,
+      "article_hits": [
+        "형법 제249조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 20310,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 6,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 7,
+      "comment": "공소시효/형의시효 구분 정확히 인지했으나 질문(공소시효)에 답하지 못함 — ground truth '형법 제249조'는 살인죄 조문으로 공소시효와 무관, 형사소송법 제249조가 올바른 출처",
+      "sum": 28,
+      "keyword_hits": [
+        "사형",
+        "무기",
+        "10년",
+        "5년",
+        "3년",
+        "공소시효"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "형법 제249조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 22464,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "hyungbub",
+    "qid": "Q3",
+    "question": "정당방위 성립 요건은?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 9,
+      "comment": "발췌 범위 한계를 정직히 인정했으나 실질적 답변 부재; §21 언급은 정확하나 내용 인용 없음",
+      "sum": 31,
+      "keyword_hits": [
+        "정당방위",
+        "방위"
+      ],
+      "keyword_hit_rate": 0.29,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 16948,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 10,
+      "citation": 10,
+      "conciseness": 9,
+      "comment": "형법 §21 정확 인용, 4요건 + 과잉방위 특례까지 체계적 정리, 한계 명시도 적절",
+      "sum": 39,
+      "keyword_hits": [
+        "정당방위",
+        "현재",
+        "부당한",
+        "침해",
+        "방위",
+        "상당한",
+        "이유"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 13425,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "hyungbub",
+    "qid": "Q4",
+    "question": "미수범 처벌 규정과 감경 사유는?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 6,
+      "conciseness": 8,
+      "comment": "발췌 한계를 정확히 인식했으나, RAG 시스템으로서 제25~28조를 검색해 실질적 답변을 제공해야 함",
+      "sum": 27,
+      "keyword_hits": [
+        "미수",
+        "감경",
+        "처벌"
+      ],
+      "keyword_hit_rate": 0.6,
+      "article_hits": [
+        "형법 제25조",
+        "형법 제26조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 20390,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 7,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 6,
+      "comment": "§28(예비·음모) 누락으로 기대 키워드 '예비, 음모' 미충족; 비판자 반박 메타 논의가 본 답변을 산만하게 함",
+      "sum": 28,
+      "keyword_hits": [
+        "미수",
+        "감경",
+        "처벌"
+      ],
+      "keyword_hit_rate": 0.6,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 19081,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "hyungbub",
+    "qid": "Q5",
+    "question": "횡령죄와 배임죄의 차이는?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 6,
+      "conciseness": 8,
+      "comment": "데이터 한계를 정직하게 인정하나 실질적 비교 답변 부재; §355 언급은 정확하나 §356·§357 미인용, 핵심 키워드(보관·임무·위배·재산상·이익) 누락",
+      "sum": 27,
+      "keyword_hits": [
+        "횡령",
+        "배임"
+      ],
+      "keyword_hit_rate": 0.29,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 20252,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 7,
+      "conciseness": 9,
+      "comment": "§355 기본 구성요건은 정확하나, ground truth 요구 §356(업무상횡령·배임)·§357(배임수재) 누락",
+      "sum": 33,
+      "keyword_hits": [
+        "횡령",
+        "배임",
+        "보관",
+        "임무",
+        "위배",
+        "재산상",
+        "이익"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 20750,
+      "scorer_error": null
+    }
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "per_law": {
+    "minbub": {
+      "display": "민법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 26.2,
+      "pi_avg_sum": 35.4,
+      "kolaw_kw_avg": 0.71,
+      "pi_kw_avg": 0.86,
+      "kolaw_art_avg": 0.13,
+      "pi_art_avg": 0.2,
+      "delta_sum": 9.2
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 26.2,
+    "pi_avg_sum": 35.4,
+    "kolaw_kw_avg": 0.71,
+    "pi_kw_avg": 0.86,
+    "kolaw_art_avg": 0.13,
+    "pi_art_avg": 0.2,
+    "delta_sum": 9.2
+  }
+}

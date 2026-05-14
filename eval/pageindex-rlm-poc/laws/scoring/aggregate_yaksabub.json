@@ -1,0 +1,25 @@
+{
+  "per_law": {
+    "yaksabub": {
+      "display": "약사법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 30.8,
+      "pi_avg_sum": 31.0,
+      "kolaw_kw_avg": 0.69,
+      "pi_kw_avg": 0.68,
+      "kolaw_art_avg": 0.25,
+      "pi_art_avg": 0.45,
+      "delta_sum": 0.2
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 30.8,
+    "pi_avg_sum": 31.0,
+    "kolaw_kw_avg": 0.69,
+    "pi_kw_avg": 0.68,
+    "kolaw_art_avg": 0.25,
+    "pi_art_avg": 0.45,
+    "delta_sum": 0.2
+  }
+}

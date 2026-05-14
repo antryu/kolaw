@@ -1,0 +1,246 @@
+[
+  {
+    "name_id": "labor",
+    "qid": "Q1",
+    "question": "법정근로시간과 연장근로 한도는?",
+    "kolaw_baseline": {
+      "accuracy": 8,
+      "logic": 8,
+      "citation": 9,
+      "conciseness": 7,
+      "comment": "발췌 한계를 인정하면서도 제50조·제53조 위치와 핵심 수치(40h/8h/12h)를 정확히 명시한 성실한 답변",
+      "sum": 32,
+      "keyword_hits": [
+        "40시간",
+        "8시간",
+        "12시간",
+        "연장근로",
+        "법정근로시간",
+        "주"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "근로기준법 제50조",
+        "근로기준법 제53조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 16730,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 9,
+      "citation": 10,
+      "conciseness": 8,
+      "comment": "법정근로시간·연장근로 한도를 정확히 설명하고 30인 미만 추가연장·특별연장까지 체계적으로 정리함; 비판반박 중복만 약간 아쉬움",
+      "sum": 37,
+      "keyword_hits": [
+        "40시간",
+        "8시간",
+        "12시간",
+        "연장근로",
+        "법정근로시간",
+        "주"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "근로기준법 제53조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 19666,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "labor",
+    "qid": "Q2",
+    "question": "임금체불 시 사용자 처벌은?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 7,
+      "comment": "발췌 한계 인지는 정직하나, 제109조 언급만 있고 제43조·실제 형량(3년/3천만원) 미제시",
+      "sum": 27,
+      "keyword_hits": [
+        "징역",
+        "벌금",
+        "임금"
+      ],
+      "keyword_hit_rate": 0.5,
+      "article_hits": [
+        "근로기준법 제109조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 19210,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 10,
+      "citation": 10,
+      "conciseness": 9,
+      "comment": "핵심 조문(§109, §43) 정확히 인용하고 형량(3년/3천만원)도 현행법과 일치하며, 명단공개·양벌규정 등 관련 제재까지 체계적으로 정리됨",
+      "sum": 39,
+      "keyword_hits": [
+        "3년",
+        "이하",
+        "징역",
+        "벌금",
+        "3천만원",
+        "임금"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "근로기준법 제109조",
+        "근로기준법 제43조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 15686,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "labor",
+    "qid": "Q3",
+    "question": "해고 제한 사유와 절차는?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "발췌 한계를 정직히 인정하고 올바른 조문 위치(제23조, 제26조, 제27조)를 안내했으나, 실질적 해고 요건/절차 답변 부재",
+      "sum": 28,
+      "keyword_hits": [
+        "이유",
+        "서면",
+        "통지"
+      ],
+      "keyword_hit_rate": 0.5,
+      "article_hits": [
+        "근로기준법 제23조",
+        "근로기준법 제26조",
+        "근로기준법 제27조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 21876,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "필수 조문(§23·§26·§27) 모두 정확히 인용, 경영상 해고 50일 전 통보 요건까지 포함하여 포괄적 답변",
+      "sum": 35,
+      "keyword_hits": [
+        "정당한",
+        "이유",
+        "30일",
+        "해고예고",
+        "서면",
+        "통지"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 23818,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "labor",
+    "qid": "Q4",
+    "question": "연차유급휴가는 어떻게 발생하고 일수는?",
+    "kolaw_baseline": {
+      "accuracy": 6,
+      "logic": 7,
+      "citation": 8,
+      "conciseness": 5,
+      "comment": "제60조 인용 및 핵심 요건(1년/80%/15일) 한계란에 언급했으나 '확인 불가'로 결론내려 실질적 답변 미달",
+      "sum": 26,
+      "keyword_hits": [
+        "1년",
+        "80%",
+        "15일",
+        "연차",
+        "유급휴가"
+      ],
+      "keyword_hit_rate": 0.83,
+      "article_hits": [
+        "근로기준법 제60조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 22231,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 10,
+      "citation": 10,
+      "conciseness": 9,
+      "comment": "§60 각 항 정확히 인용, 15일/80%/가산휴가/소멸 규정 모두 정확; 한계 명시도 적절",
+      "sum": 39,
+      "keyword_hits": [
+        "1년",
+        "80%",
+        "15일",
+        "연차",
+        "유급휴가"
+      ],
+      "keyword_hit_rate": 0.83,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 12341,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "labor",
+    "qid": "Q5",
+    "question": "사업장 적용 범위 (5인 미만 등)?",
+    "kolaw_baseline": {
+      "accuracy": 7,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "발췌 한계를 정직히 인정하고 제11조/시행령 참조를 정확히 안내함 — retrieval 실패지만 hallucination 없는 모범적 대응",
+      "sum": 33,
+      "keyword_hits": [
+        "5인 미만",
+        "근로자",
+        "적용",
+        "시행령"
+      ],
+      "keyword_hit_rate": 0.67,
+      "article_hits": [
+        "근로기준법 제11조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 14766,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "제11조 및 시행령 정확히 인용, 5인 기준·상시 근로자 산정·별표 1 적용 구조 명확; 별표 1 미확인 한계 솔직히 명시",
+      "sum": 35,
+      "keyword_hits": [
+        "5인 이상",
+        "상시",
+        "근로자",
+        "적용",
+        "시행령"
+      ],
+      "keyword_hit_rate": 0.83,
+      "article_hits": [
+        "근로기준법 제11조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 16445,
+      "scorer_error": null
+    }
+  }
+]

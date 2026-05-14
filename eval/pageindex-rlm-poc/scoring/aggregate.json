@@ -1,0 +1,21 @@
+{
+  "n_questions": 5,
+  "kolaw_baseline_avg": {
+    "accuracy": 4.8,
+    "logic": 6.8,
+    "citation": 6.2,
+    "conciseness": 7.2,
+    "sum": 25.0
+  },
+  "pageindex_rlm_avg": {
+    "accuracy": 5.8,
+    "logic": 7.4,
+    "citation": 6.0,
+    "conciseness": 8.0,
+    "sum": 27.2
+  },
+  "kolaw_keyword_hit_avg": 0.51,
+  "pageindex_keyword_hit_avg": 0.49,
+  "kolaw_article_hit_avg": 0.5,
+  "pageindex_article_hit_avg": 0.4
+}

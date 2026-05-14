@@ -1,0 +1,29 @@
+
+=== minbub (민법) ===
+  -> Q1: 민법상 계약 성립 요건은?
+     [kolaw_baseline]
+       cands=8 lat=11359ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=154223ms in=17851 out=1474
+  -> Q2: 불법행위 손해배상 청구 요건은?
+     [kolaw_baseline]
+       cands=8 lat=13650ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=3 lat=257632ms in=6024 out=899
+  -> Q3: 소유권 취득시효 기간은?
+     [kolaw_baseline]
+       cands=8 lat=10422ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=3 lat=231190ms in=15985 out=988
+  -> Q4: 혼인의 효력은 언제 발생하나?
+     [kolaw_baseline]
+       cands=8 lat=13592ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=2 lat=122870ms in=9279 out=296
+  -> Q5: 유언의 방식 종류는?
+     [kolaw_baseline]
+       cands=8 lat=11602ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=3 lat=208535ms in=11077 out=667
+
+Wrote /Users/andrew/PRJs/kolaw/eval/pageindex-rlm-poc/laws/answers/summary_cost_minbub.json (wall 1035.1s)

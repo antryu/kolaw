@@ -1,0 +1,244 @@
+[
+  {
+    "name_id": "jabonsijang",
+    "qid": "Q1",
+    "question": "자본시장법상 공시 의무 (정기·수시) 는?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "검색 범위 한계를 정직히 인정하고 관련 조문(159-161조) 정확히 지목했으나, 실질적 답변 미제공",
+      "sum": 28,
+      "keyword_hits": [
+        "사업보고서",
+        "반기보고서",
+        "분기보고서",
+        "주요사항보고서",
+        "공시"
+      ],
+      "keyword_hit_rate": 0.83,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제159조",
+        "자본시장과금융투자업에관한법률 제161조"
+      ],
+      "article_hit_rate": 0.67,
+      "scorer_latency_ms": 18148,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 10,
+      "conciseness": 7,
+      "comment": "정기·수시공시 체계 및 §159/160/161 핵심 조문 정확히 인용; '비판 반영' 메타 섹션은 군더더기",
+      "sum": 35,
+      "keyword_hits": [
+        "사업보고서",
+        "반기보고서",
+        "분기보고서",
+        "주요사항보고서",
+        "공시",
+        "금융위원회"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 19877,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "jabonsijang",
+    "qid": "Q2",
+    "question": "내부자거래 금지와 처벌은?",
+    "kolaw_baseline": {
+      "accuracy": 4,
+      "logic": 8,
+      "citation": 5,
+      "conciseness": 8,
+      "comment": "발췌 한계를 정직히 인정했으나 제174조·제443조 내용(10년 이하 징역, 5억원 이하 벌금 등) 미제공으로 실질적 답변 부재",
+      "sum": 25,
+      "keyword_hits": [
+        "내부자",
+        "미공개중요정보"
+      ],
+      "keyword_hit_rate": 0.29,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제174조",
+        "자본시장과금융투자업에관한법률 제443조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 18234,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "제174조·제443조 인용 정확, 형량 배수(4~6배)는 최신 개정 가능성 있어 검증 필요; 기대 키워드 '10년'은 미언급되었으나 현행법 구조상 '1년 이상 유기징역'이 맞을 수 있음",
+      "sum": 34,
+      "keyword_hits": [
+        "내부자",
+        "미공개중요정보",
+        "이하",
+        "징역",
+        "벌금",
+        "5억원"
+      ],
+      "keyword_hit_rate": 0.86,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제174조",
+        "자본시장과금융투자업에관한법률 제443조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 30314,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "jabonsijang",
+    "qid": "Q3",
+    "question": "시세조종 금지 행위 유형은?",
+    "kolaw_baseline": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 9,
+      "comment": "제176조 4개 유형(통정·가장·매매유인·시세고정·연계) 정확히 구분, 기대 키워드 대부분 포함, 조문 인용 정확",
+      "sum": 36,
+      "keyword_hits": [
+        "시세조종",
+        "통정매매",
+        "가장매매",
+        "안정조작"
+      ],
+      "keyword_hit_rate": 0.67,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제176조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 14017,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "§176 4개항 유형을 정확히 분류하고 기대 키워드 전부 포함, 예외조항까지 설명하여 완성도 높음; 비판반영 섹션은 다소 사족",
+      "sum": 35,
+      "keyword_hits": [
+        "시세조종",
+        "통정매매",
+        "가장매매",
+        "안정조작"
+      ],
+      "keyword_hit_rate": 0.67,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제176조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 16640,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "jabonsijang",
+    "qid": "Q4",
+    "question": "금융투자업 인가 종류와 자기자본 요건은?",
+    "kolaw_baseline": {
+      "accuracy": 7,
+      "logic": 8,
+      "citation": 6,
+      "conciseness": 8,
+      "comment": "6종류·인가/등록 구분 정확하나 ground truth §12·§15 직접 인용 없이 '확인 불가' 처리; 자기자본 요건 미제시는 발췌 한계 인정으로 감점 최소화",
+      "sum": 29,
+      "keyword_hits": [
+        "투자매매업",
+        "투자중개업",
+        "집합투자업",
+        "투자자문업",
+        "투자일임업",
+        "신탁업",
+        "인가",
+        "자기자본"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 16791,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 8,
+      "comment": "§12 정확 인용, 인가/등록 구분 명확, 다만 ground truth 제15조(자기자본) 명시 인용 누락 — 별표1 한계 솔직히 명시한 점 양호",
+      "sum": 34,
+      "keyword_hits": [
+        "투자매매업",
+        "투자중개업",
+        "집합투자업",
+        "투자자문업",
+        "투자일임업",
+        "신탁업",
+        "인가",
+        "자기자본"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 20816,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "jabonsijang",
+    "qid": "Q5",
+    "question": "과징금 부과 대상과 산정 방식은?",
+    "kolaw_baseline": {
+      "accuracy": 3,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "발췌 한계 인정은 정직하나 제429조·제430조 조문 미검색으로 과징금 요건(20억 상한 등) 답변 실패",
+      "sum": 26,
+      "keyword_hits": [
+        "과징금",
+        "산정",
+        "부과"
+      ],
+      "keyword_hit_rate": 0.43,
+      "article_hits": [
+        "자본시장과금융투자업에관한법률 제429조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 16847,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "§429·§430 정확 인용, 산정비율·한도 상세; 부과주체 '금융위원회' 명시 누락이 아쉬우나 조문 커버리지 우수",
+      "sum": 35,
+      "keyword_hits": [
+        "과징금",
+        "위반",
+        "산정",
+        "부과",
+        "20억",
+        "공시"
+      ],
+      "keyword_hit_rate": 0.86,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 21065,
+      "scorer_error": null
+    }
+  }
+]

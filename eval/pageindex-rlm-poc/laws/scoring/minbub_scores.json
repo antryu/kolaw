@@ -1,0 +1,227 @@
+[
+  {
+    "name_id": "minbub",
+    "qid": "Q1",
+    "question": "민법상 계약 성립 요건은?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "검색 실패를 정직하게 인정했으나 실제 계약 성립 요건(청약·승낙)에 대한 답변 미제공 — retrieval scope 문제",
+      "sum": 28,
+      "keyword_hits": [
+        "청약",
+        "승낙",
+        "의사표시",
+        "계약"
+      ],
+      "keyword_hit_rate": 0.8,
+      "article_hits": [
+        "민법 제527조",
+        "민법 제534조"
+      ],
+      "article_hit_rate": 0.67,
+      "scorer_latency_ms": 16385,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 8,
+      "comment": "§535(계약체결상 과실) 누락; 청약·승낙 합치 원칙과 §527·§534 등 핵심 조문은 정확하고 체계적으로 설명",
+      "sum": 33,
+      "keyword_hits": [
+        "청약",
+        "승낙",
+        "의사표시",
+        "계약"
+      ],
+      "keyword_hit_rate": 0.8,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 18280,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "minbub",
+    "qid": "Q2",
+    "question": "불법행위 손해배상 청구 요건은?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 8,
+      "citation": 4,
+      "conciseness": 7,
+      "comment": "RAG 한계 인정은 정직하나 실질 답변 부재; §750·751·763 인용 없음, 요건 언급은 §3 한계란에 약술만",
+      "sum": 24,
+      "keyword_hits": [
+        "고의",
+        "과실",
+        "위법",
+        "손해",
+        "인과관계",
+        "배상"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 21310,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 10,
+      "conciseness": 8,
+      "comment": "4대 요건·책임주체 확대·면책사유·소멸시효까지 체계적으로 정리, ground truth 조문(§750, §751, §763) 모두 정확히 인용됨",
+      "sum": 36,
+      "keyword_hits": [
+        "고의",
+        "과실",
+        "위법",
+        "손해",
+        "인과관계",
+        "배상"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 14954,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "minbub",
+    "qid": "Q3",
+    "question": "소유권 취득시효 기간은?",
+    "kolaw_baseline": {
+      "accuracy": 7,
+      "logic": 8,
+      "citation": 9,
+      "conciseness": 9,
+      "comment": "발췌 범위 한계를 정직히 인정하고 필요 조문(§245/§246)과 기간(20년/10년)을 정확히 안내했으나, 선의·무과실 요건 미언급으로 감점",
+      "sum": 33,
+      "keyword_hits": [
+        "20년",
+        "10년",
+        "취득시효"
+      ],
+      "keyword_hit_rate": 0.5,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 19898,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 9,
+      "citation": 10,
+      "conciseness": 8,
+      "comment": "제245조·제246조 정확 인용, 부동산/동산 구분 명료, 비판 반영 섹션은 약간 군더더기이나 전체적으로 모범 답안 수준",
+      "sum": 37,
+      "keyword_hits": [
+        "20년",
+        "10년",
+        "점유",
+        "취득시효",
+        "선의",
+        "무과실"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "민법 제245조",
+        "민법 제246조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 15462,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "minbub",
+    "qid": "Q4",
+    "question": "혼인의 효력은 언제 발생하나?",
+    "kolaw_baseline": {
+      "accuracy": 4,
+      "logic": 8,
+      "citation": 6,
+      "conciseness": 8,
+      "comment": "검색 실패 인정 후 정답 조문(§812) 정확히 지목했으나 실질 답변 없음 — retrieval coverage 문제",
+      "sum": 26,
+      "keyword_hits": [
+        "효력"
+      ],
+      "keyword_hit_rate": 0.25,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 21904,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 9,
+      "comment": "제812조 정확 인용, 제815조(혼인무효사유) 및 '동의' 키워드 누락되었으나 질문의 핵심인 효력 발생 시점은 정확히 답변",
+      "sum": 34,
+      "keyword_hits": [
+        "혼인신고",
+        "효력"
+      ],
+      "keyword_hit_rate": 0.5,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 21422,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "minbub",
+    "qid": "Q5",
+    "question": "유언의 방식 종류는?",
+    "kolaw_baseline": {
+      "accuracy": 6,
+      "logic": 7,
+      "citation": 3,
+      "conciseness": 8,
+      "comment": "정확한 5가지 방식을 '발췌 외 지식'으로 언급했으나, RAG가 §1065-1070 검색 실패하여 공식 결론은 '확인 불가'로 처리됨 — retrieval 실패 케이스",
+      "sum": 24,
+      "keyword_hits": [
+        "자필증서",
+        "공정증서",
+        "비밀증서",
+        "녹음",
+        "구수증서",
+        "유언"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 20932,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 10,
+      "logic": 10,
+      "citation": 10,
+      "conciseness": 9,
+      "comment": "5종 유언방식 및 §1065~§1070 요건 정확히 기술, 시스템 메시지 잔여로 -1",
+      "sum": 39,
+      "keyword_hits": [
+        "자필증서",
+        "공정증서",
+        "비밀증서",
+        "녹음",
+        "구수증서",
+        "유언"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 15463,
+      "scorer_error": null
+    }
+  }
+]

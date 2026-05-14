@@ -1,0 +1,69 @@
+{
+  "per_law": {
+    "yaksabub": {
+      "display": "약사법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 30.8,
+      "pi_avg_sum": 31.4,
+      "kolaw_kw_avg": 0.69,
+      "pi_kw_avg": 0.68,
+      "kolaw_art_avg": 0.25,
+      "pi_art_avg": 0.45,
+      "delta_sum": 0.6
+    },
+    "minbub": {
+      "display": "민법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 26.8,
+      "pi_avg_sum": 35.6,
+      "kolaw_kw_avg": 0.71,
+      "pi_kw_avg": 0.86,
+      "kolaw_art_avg": 0.13,
+      "pi_art_avg": 0.2,
+      "delta_sum": 8.8
+    },
+    "hyungbub": {
+      "display": "형법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 27.2,
+      "pi_avg_sum": 33.2,
+      "kolaw_kw_avg": 0.47,
+      "pi_kw_avg": 0.92,
+      "kolaw_art_avg": 0.3,
+      "pi_art_avg": 0.2,
+      "delta_sum": 6.0
+    },
+    "labor": {
+      "display": "근로기준법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 29.2,
+      "pi_avg_sum": 37.0,
+      "kolaw_kw_avg": 0.7,
+      "pi_kw_avg": 0.93,
+      "kolaw_art_avg": 0.9,
+      "pi_art_avg": 0.5,
+      "delta_sum": 7.8
+    },
+    "jabonsijang": {
+      "display": "자본시장과금융투자업에관한법률",
+      "n_questions": 5,
+      "kolaw_avg_sum": 28.8,
+      "pi_avg_sum": 34.6,
+      "kolaw_kw_avg": 0.64,
+      "pi_kw_avg": 0.88,
+      "kolaw_art_avg": 0.63,
+      "pi_art_avg": 0.4,
+      "delta_sum": 5.8
+    }
+  },
+  "grand_avg": {
+    "n_total": 25,
+    "kolaw_avg_sum": 28.56,
+    "pi_avg_sum": 34.36,
+    "kolaw_kw_avg": 0.64,
+    "pi_kw_avg": 0.85,
+    "kolaw_art_avg": 0.44,
+    "pi_art_avg": 0.35,
+    "delta_sum": 5.8
+  }
+}

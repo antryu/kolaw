@@ -1,0 +1,25 @@
+{
+  "per_law": {
+    "jabonsijang": {
+      "display": "자본시장과금융투자업에관한법률",
+      "n_questions": 5,
+      "kolaw_avg_sum": 29.4,
+      "pi_avg_sum": 34.0,
+      "kolaw_kw_avg": 0.64,
+      "pi_kw_avg": 0.88,
+      "kolaw_art_avg": 0.63,
+      "pi_art_avg": 0.4,
+      "delta_sum": 4.6
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 29.4,
+    "pi_avg_sum": 34.0,
+    "kolaw_kw_avg": 0.64,
+    "pi_kw_avg": 0.88,
+    "kolaw_art_avg": 0.63,
+    "pi_art_avg": 0.4,
+    "delta_sum": 4.6
+  }
+}

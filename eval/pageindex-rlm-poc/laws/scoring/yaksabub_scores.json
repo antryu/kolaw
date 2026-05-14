@@ -1,0 +1,233 @@
+[
+  {
+    "name_id": "yaksabub",
+    "qid": "Q1",
+    "question": "약사법상 의약품 판매업의 종류와 등록 요건은?",
+    "kolaw_baseline": {
+      "accuracy": 4,
+      "logic": 7,
+      "citation": 6,
+      "conciseness": 7,
+      "comment": "검색 한계를 솔직히 인정하고 hallucination 없이 §45 언급했으나, 핵심 §20(약국개설등록) 누락 및 실질 답변 부재로 accuracy 저조",
+      "sum": 24,
+      "keyword_hits": [
+        "약국",
+        "한약업사",
+        "허가",
+        "등록",
+        "약사"
+      ],
+      "keyword_hit_rate": 0.71,
+      "article_hits": [
+        "약사법 제45조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 18600,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 3,
+      "logic": 7,
+      "citation": 5,
+      "conciseness": 8,
+      "comment": "검색 범위 한계로 핵심 조문(제20조, 제45조) 미도달; hallucination 회피는 긍정적이나 실질 답변 부재",
+      "sum": 23,
+      "keyword_hits": [
+        "허가",
+        "등록"
+      ],
+      "keyword_hit_rate": 0.29,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 23051,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "yaksabub",
+    "qid": "Q2",
+    "question": "의약품 광고 위반 시 처벌 수위는?",
+    "kolaw_baseline": {
+      "accuracy": 2,
+      "logic": 8,
+      "citation": 4,
+      "conciseness": 8,
+      "comment": "발췌 범위 한계를 솔직히 인정했으나 기대 키워드·ground truth 조문(§93~§97) 모두 미충족—검색 실패로 실질 답변 불가",
+      "sum": 22,
+      "keyword_hits": [
+        "벌금",
+        "징역"
+      ],
+      "keyword_hit_rate": 0.25,
+      "article_hits": [
+        "약사법 제93조"
+      ],
+      "article_hit_rate": 0.25,
+      "scorer_latency_ms": 16933,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 6,
+      "logic": 7,
+      "citation": 5,
+      "conciseness": 7,
+      "comment": "ground truth 조문 중 제93조·제94조 누락, 기대 키워드 2년/3년/3천만원 미반영으로 광고 위반 처벌 범위 불완전 — 제93조 광고 무관 주장은 검증 필요",
+      "sum": 25,
+      "keyword_hits": [
+        "1년",
+        "벌금",
+        "징역",
+        "500만원",
+        "1천만원"
+      ],
+      "keyword_hit_rate": 0.62,
+      "article_hits": [
+        "약사법 제93조",
+        "약사법 제95조",
+        "약사법 제97조"
+      ],
+      "article_hit_rate": 0.75,
+      "scorer_latency_ms": 21771,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "yaksabub",
+    "qid": "Q3",
+    "question": "전문의약품과 일반의약품 분류 기준은?",
+    "kolaw_baseline": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 7,
+      "conciseness": 9,
+      "comment": "제2조 인용 정확하나 ground truth 필수 조문인 제50조(의약품 분류·변경 절차) 누락; 핵심 키워드 전부 포함",
+      "sum": 33,
+      "keyword_hits": [
+        "전문의약품",
+        "일반의약품",
+        "분류",
+        "안전성",
+        "유효성",
+        "보건복지부장관"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "약사법 제2조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 15151,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 9,
+      "comment": "제2조 정의 정확, 다만 ground truth의 제50조(판매·조제 제한) 인용 누락",
+      "sum": 34,
+      "keyword_hits": [
+        "전문의약품",
+        "일반의약품",
+        "분류",
+        "안전성",
+        "유효성",
+        "보건복지부장관"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "약사법 제2조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 15541,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "yaksabub",
+    "qid": "Q4",
+    "question": "약사 면허 결격사유는?",
+    "kolaw_baseline": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "약사법 §5 결격사유 6유형을 표로 정확히 정리, 기대 키워드 완비, 한계 명시로 신뢰도 높음",
+      "sum": 35,
+      "keyword_hits": [
+        "정신질환",
+        "마약",
+        "피성년후견인",
+        "결격"
+      ],
+      "keyword_hit_rate": 0.67,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 16348,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 9,
+      "comment": "§5조 5개호 충실히 인용, 금치산/한정치산은 현행법상 피성년후견인/피한정후견인으로 대체된 용어이므로 정확한 최신 표현 사용",
+      "sum": 36,
+      "keyword_hits": [
+        "정신질환",
+        "마약",
+        "피성년후견인",
+        "결격"
+      ],
+      "keyword_hit_rate": 0.67,
+      "article_hits": [
+        "약사법 제5조"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 16006,
+      "scorer_error": null
+    }
+  },
+  {
+    "name_id": "yaksabub",
+    "qid": "Q5",
+    "question": "약사법 시행령·시행규칙 어디에 위임되어 있나?",
+    "kolaw_baseline": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 9,
+      "comment": "발췌 범위 내 시행령/시행규칙 위임 조항을 체계적으로 정리했으나, 총리령 언급 누락 및 전체 법령 미커버는 데이터 한계로 감안",
+      "sum": 35,
+      "keyword_hits": [
+        "시행령",
+        "시행규칙",
+        "보건복지부령",
+        "대통령령"
+      ],
+      "keyword_hit_rate": 0.8,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 14640,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 8,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 7,
+      "comment": "제9장 위임조문 정리 우수하나 '보건복지부령' 키워드 누락, 제1~8장 위임규정 미포함 한계 명시",
+      "sum": 32,
+      "keyword_hits": [
+        "시행령",
+        "시행규칙",
+        "대통령령",
+        "총리령"
+      ],
+      "keyword_hit_rate": 0.8,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 21613,
+      "scorer_error": null
+    }
+  }
+]

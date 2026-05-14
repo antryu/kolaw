@@ -1,0 +1,15 @@
+{
+  "per_law": [
+    {
+      "name_id": "minbub",
+      "kolaw_calls": 5,
+      "kolaw_lat_ms": 60625,
+      "pi_calls": 5,
+      "pi_lat_ms": 974450,
+      "pi_total_cycles": 14,
+      "pi_in_tokens": 60216,
+      "pi_out_tokens": 4324
+    }
+  ],
+  "wall_time_s": 1035.1
+}

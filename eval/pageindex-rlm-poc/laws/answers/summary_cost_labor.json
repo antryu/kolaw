@@ -1,0 +1,15 @@
+{
+  "per_law": [
+    {
+      "name_id": "labor",
+      "kolaw_calls": 5,
+      "kolaw_lat_ms": 65848,
+      "pi_calls": 5,
+      "pi_lat_ms": 806822,
+      "pi_total_cycles": 9,
+      "pi_in_tokens": 39480,
+      "pi_out_tokens": 3133
+    }
+  ],
+  "wall_time_s": 872.7
+}

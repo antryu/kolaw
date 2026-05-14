@@ -1,0 +1,29 @@
+
+=== yaksabub (약사법) ===
+  -> Q1: 약사법상 의약품 판매업의 종류와 등록 요건은?
+     [kolaw_baseline]
+       cands=8 lat=17896ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=247240ms in=14010 out=509
+  -> Q2: 의약품 광고 위반 시 처벌 수위는?
+     [kolaw_baseline]
+       cands=8 lat=13544ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=301250ms in=14967 out=1147
+  -> Q3: 전문의약품과 일반의약품 분류 기준은?
+     [kolaw_baseline]
+       cands=8 lat=16892ms err=None
+     [pageindex+rlm]
+       nav=2 cycles=1 lat=116639ms in=6200 out=268
+  -> Q4: 약사 면허 결격사유는?
+     [kolaw_baseline]
+       cands=8 lat=19921ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=1 lat=78562ms in=3311 out=312
+  -> Q5: 약사법 시행령·시행규칙 어디에 위임되어 있나?
+     [kolaw_baseline]
+       cands=8 lat=14486ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=235877ms in=16850 out=1370
+
+Wrote /Users/andrew/PRJs/kolaw/eval/pageindex-rlm-poc/laws/answers/summary_cost_yaksabub.json (wall 1062.3s)

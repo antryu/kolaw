@@ -1,0 +1,15 @@
+{
+  "per_law": [
+    {
+      "name_id": "hyungbub",
+      "kolaw_calls": 5,
+      "kolaw_lat_ms": 61725,
+      "pi_calls": 5,
+      "pi_lat_ms": 532550,
+      "pi_total_cycles": 9,
+      "pi_in_tokens": 46754,
+      "pi_out_tokens": 4161
+    }
+  ],
+  "wall_time_s": 594.3
+}

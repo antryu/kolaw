@@ -1,0 +1,29 @@
+
+=== labor (근로기준법) ===
+  -> Q1: 법정근로시간과 연장근로 한도는?
+     [kolaw_baseline]
+       cands=8 lat=12951ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=327894ms in=13963 out=982
+  -> Q2: 임금체불 시 사용자 처벌은?
+     [kolaw_baseline]
+       cands=8 lat=14571ms err=None
+     [pageindex+rlm]
+       nav=2 cycles=1 lat=60172ms in=6079 out=376
+  -> Q3: 해고 제한 사유와 절차는?
+     [kolaw_baseline]
+       cands=8 lat=13749ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=1 lat=116600ms in=7078 out=629
+  -> Q4: 연차유급휴가는 어떻게 발생하고 일수는?
+     [kolaw_baseline]
+       cands=8 lat=10564ms err=None
+     [pageindex+rlm]
+       nav=2 cycles=1 lat=98390ms in=5309 out=299
+  -> Q5: 사업장 적용 범위 (5인 미만 등)?
+     [kolaw_baseline]
+       cands=8 lat=14013ms err=None
+     [pageindex+rlm]
+       nav=3 cycles=3 lat=203766ms in=7051 out=847
+
+Wrote /Users/andrew/PRJs/kolaw/eval/pageindex-rlm-poc/laws/answers/summary_cost_labor.json (wall 872.7s)

@@ -1,6 +1,3 @@
-import pytest
-pytestmark = pytest.mark.skip(reason="Phase 1 ChromaDB / mock-RLM tests; superseded by Phase 3 architecture (services.data.legalize_kr.grep_search + services.data.law_go_kr.LawGoKrClient)")
-
 """
 test_rlm_minimal_loop.py — Phase 2 RLM minimal loop tests.
 
@@ -102,13 +99,15 @@ class TestTrajectoryToResponse:
 class TestRLMMinimalLoop:
     """Run the full RLM loop with a mocked LLM that returns valid code."""
 
+    # Phase 3: sandbox uses RestrictedPython which forbids slice subscripts
+    # (text[:100] etc). The mock builds FINAL_ANSWER without slicing on str.
     _MOCK_CODE = (
         "```python\n"
         "relevant = []\n"
-        "for name, text in law_texts.items():\n"
+        "for name in law_texts:\n"
         "    relevant.append({'law_id': 'mock001', 'law_name': name, "
-        "'article': '제1조', 'excerpt': text[:100]})\n"
-        "FINAL_ANSWER = relevant[:3]\n"
+        "'article': '제1조', 'excerpt': 'mock excerpt'})\n"
+        "FINAL_ANSWER = relevant\n"
         "```"
     )
 
@@ -130,7 +129,8 @@ class TestRLMMinimalLoop:
         assert log.final_answer is not None
         assert isinstance(log.final_answer, list)
         assert log.error is None
-        assert len(log.steps) >= 2  # at least prefilter + llm_generate
+        # Phase 3 emits law_prefilter + llm_generate + exec → at least 3 steps.
+        assert len(log.steps) >= 2
 
     @pytest.mark.asyncio
     async def test_run_llm_unavailable_returns_error(self):

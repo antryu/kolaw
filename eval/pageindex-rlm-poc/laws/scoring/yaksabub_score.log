@@ -1,0 +1,49 @@
+
+=== yaksabub (약사법) ===
+  -> yaksabub Q1 kolaw...
+     sum=27 kw=0.71 art=0.5
+  -> yaksabub Q1 pageindex...
+     sum=25 kw=0.29 art=0.0
+  -> yaksabub Q2 kolaw...
+     sum=24 kw=0.25 art=0.25
+  -> yaksabub Q2 pageindex...
+     sum=27 kw=0.62 art=0.75
+  -> yaksabub Q3 kolaw...
+     sum=33 kw=1.0 art=0.5
+  -> yaksabub Q3 pageindex...
+     sum=33 kw=1.0 art=0.5
+  -> yaksabub Q4 kolaw...
+     sum=36 kw=0.67 art=0.0
+  -> yaksabub Q4 pageindex...
+     sum=38 kw=0.67 art=1.0
+  -> yaksabub Q5 kolaw...
+     sum=34 kw=0.8 art=0.0
+  -> yaksabub Q5 pageindex...
+     sum=32 kw=0.8 art=0.0
+
+=== Aggregate ===
+{
+  "per_law": {
+    "yaksabub": {
+      "display": "약사법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 30.8,
+      "pi_avg_sum": 31.0,
+      "kolaw_kw_avg": 0.69,
+      "pi_kw_avg": 0.68,
+      "kolaw_art_avg": 0.25,
+      "pi_art_avg": 0.45,
+      "delta_sum": 0.2
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 30.8,
+    "pi_avg_sum": 31.0,
+    "kolaw_kw_avg": 0.69,
+    "pi_kw_avg": 0.68,
+    "kolaw_art_avg": 0.25,
+    "pi_art_avg": 0.45,
+    "delta_sum": 0.2
+  }
+}

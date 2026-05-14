@@ -1,0 +1,25 @@
+{
+  "per_law": {
+    "labor": {
+      "display": "근로기준법",
+      "n_questions": 5,
+      "kolaw_avg_sum": 26.6,
+      "pi_avg_sum": 36.4,
+      "kolaw_kw_avg": 0.7,
+      "pi_kw_avg": 0.93,
+      "kolaw_art_avg": 0.9,
+      "pi_art_avg": 0.5,
+      "delta_sum": 9.8
+    }
+  },
+  "grand_avg": {
+    "n_total": 5,
+    "kolaw_avg_sum": 26.6,
+    "pi_avg_sum": 36.4,
+    "kolaw_kw_avg": 0.7,
+    "pi_kw_avg": 0.93,
+    "kolaw_art_avg": 0.9,
+    "pi_art_avg": 0.5,
+    "delta_sum": 9.8
+  }
+}

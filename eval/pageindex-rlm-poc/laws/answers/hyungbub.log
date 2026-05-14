@@ -1,0 +1,29 @@
+
+=== hyungbub (형법) ===
+  -> Q1: 사기죄의 구성요건과 형량은?
+     [kolaw_baseline]
+       cands=8 lat=12908ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=3 lat=170249ms in=7849 out=1272
+  -> Q2: 공소시효는 형의 종류별로 어떻게 다른가?
+     [kolaw_baseline]
+       cands=8 lat=12268ms err=None
+     [pageindex+rlm]
+       nav=2 cycles=3 lat=126516ms in=16265 out=985
+  -> Q3: 정당방위 성립 요건은?
+     [kolaw_baseline]
+       cands=8 lat=11270ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=0 lat=37261ms in=3095 out=345
+  -> Q4: 미수범 처벌 규정과 감경 사유는?
+     [kolaw_baseline]
+       cands=8 lat=14495ms err=None
+     [pageindex+rlm]
+       nav=2 cycles=3 lat=162494ms in=17671 out=1337
+  -> Q5: 횡령죄와 배임죄의 차이는?
+     [kolaw_baseline]
+       cands=8 lat=10784ms err=None
+     [pageindex+rlm]
+       nav=1 cycles=0 lat=36030ms in=1874 out=222
+
+Wrote /Users/andrew/PRJs/kolaw/eval/pageindex-rlm-poc/laws/answers/summary_cost_hyungbub.json (wall 594.3s)

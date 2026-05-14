@@ -1,0 +1,15 @@
+{
+  "per_law": [
+    {
+      "name_id": "yaksabub",
+      "kolaw_calls": 5,
+      "kolaw_lat_ms": 82739,
+      "pi_calls": 5,
+      "pi_lat_ms": 979568,
+      "pi_total_cycles": 11,
+      "pi_in_tokens": 55338,
+      "pi_out_tokens": 3606
+    }
+  ],
+  "wall_time_s": 1062.3
+}

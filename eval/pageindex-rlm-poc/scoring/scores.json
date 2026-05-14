@@ -1,0 +1,221 @@
+[
+  {
+    "qid": "Q1",
+    "question": "의료법상 진료기록 보존기간은?",
+    "kolaw_baseline": {
+      "accuracy": 6,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 7,
+      "comment": "검색 실패를 솔직히 인정하고 올바른 조문(§22, 시행규칙§15)을 지목했으나, 기대 키워드(5년·3년·수술기록·방사선 등) 누락으로 실질 답변 불완전.",
+      "sum": 30,
+      "keyword_hits": [
+        "10년",
+        "2년",
+        "진료기록부",
+        "처방전"
+      ],
+      "keyword_hit_rate": 0.44,
+      "article_hits": [
+        "의료법 제22조 (진료기록부 등)",
+        "의료법 시행규칙 제15조 (진료기록부 등의 보존)"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 20790,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 8,
+      "conciseness": 8,
+      "comment": "시행규칙 §15 인용 정확하고 기간별 분류 완벽하나, ground truth 요구인 의료법 §22 본문 직접 인용 부재가 감점 요인",
+      "sum": 34,
+      "keyword_hits": [
+        "10년",
+        "5년",
+        "3년",
+        "2년",
+        "진료기록부",
+        "처방전",
+        "수술기록",
+        "방사선"
+      ],
+      "keyword_hit_rate": 0.89,
+      "article_hits": [
+        "의료법 제22조 (진료기록부 등)",
+        "의료법 시행규칙 제15조 (진료기록부 등의 보존)"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 17049,
+      "scorer_error": null
+    }
+  },
+  {
+    "qid": "Q2",
+    "question": "위반 시 처벌 수위는?",
+    "kolaw_baseline": {
+      "accuracy": 3,
+      "logic": 5,
+      "citation": 3,
+      "conciseness": 7,
+      "comment": "§87만 언급, ground truth 조문(§87조의2, §88~§91) 및 기대 키워드(3년, 1년, 300만원~3천만원) 전부 누락",
+      "sum": 18,
+      "keyword_hits": [
+        "벌금",
+        "징역"
+      ],
+      "keyword_hit_rate": 0.25,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 18798,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 9,
+      "logic": 9,
+      "citation": 9,
+      "conciseness": 8,
+      "comment": "기대 조문(§87조의2~§91) 전부 인용, 키워드 전부 포함, 표 형식 정리 우수; '비판 반영 요약' 섹션은 군더더기",
+      "sum": 35,
+      "keyword_hits": [
+        "3년",
+        "1년",
+        "벌금",
+        "징역",
+        "500만원"
+      ],
+      "keyword_hit_rate": 0.62,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 18062,
+      "scorer_error": null
+    }
+  },
+  {
+    "qid": "Q3",
+    "question": "예외 사유 (보존기간 미적용 케이스) 있나?",
+    "kolaw_baseline": {
+      "accuracy": 3,
+      "logic": 5,
+      "citation": 5,
+      "conciseness": 7,
+      "comment": "시행규칙 미조회로 마이크로필름·폐업이송 등 핵심 예외 누락, 기대 키워드 6개 중 전자의무기록·보건복지부장관만 언급",
+      "sum": 20,
+      "keyword_hits": [
+        "전자의무기록"
+      ],
+      "keyword_hit_rate": 0.17,
+      "article_hits": [
+        "의료법 시행규칙 제15조",
+        "의료법 시행규칙 제16조"
+      ],
+      "article_hit_rate": 0.5,
+      "scorer_latency_ms": 18412,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 3,
+      "logic": 5,
+      "citation": 2,
+      "conciseness": 7,
+      "comment": "ground truth 조문(제22조, 제23조, 시행규칙 제15조, 제16조) 전혀 미인용, 전자의무기록·마이크로필름·폐업이송 등 핵심 예외 사유 누락, §86조의3 천재지변 면책만 언급하여 불완전",
+      "sum": 17,
+      "keyword_hits": [
+        "폐업"
+      ],
+      "keyword_hit_rate": 0.17,
+      "article_hits": [],
+      "article_hit_rate": 0.0,
+      "scorer_latency_ms": 17627,
+      "scorer_error": null
+    }
+  },
+  {
+    "qid": "Q4",
+    "question": "의료법 개정 이력 — 최근 5년 주요 변경점?",
+    "kolaw_baseline": {
+      "accuracy": 5,
+      "logic": 7,
+      "citation": 7,
+      "conciseness": 8,
+      "comment": "발췌 한계 명시는 양호하나 기대 키워드 중 2021~2023, 비대면 관련 개정 전혀 누락 — 최근 5년 질문 대비 커버리지 부족",
+      "sum": 27,
+      "keyword_hits": [
+        "2021",
+        "2024",
+        "2025",
+        "2026",
+        "전문병원",
+        "면허",
+        "벌칙"
+      ],
+      "keyword_hit_rate": 0.7,
+      "article_hits": [],
+      "article_hit_rate": 0,
+      "scorer_latency_ms": 20467,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 1,
+      "logic": 6,
+      "citation": 4,
+      "conciseness": 8,
+      "comment": "발췌 부재 인정은 정직하나, 의료법 개정 내용 무응답으로 실질 가치 0 — 검색 실패.",
+      "sum": 19,
+      "keyword_hits": [],
+      "keyword_hit_rate": 0.0,
+      "article_hits": [],
+      "article_hit_rate": 0,
+      "scorer_latency_ms": 24066,
+      "scorer_error": null
+    }
+  },
+  {
+    "qid": "Q5",
+    "question": "의료법 관련 시행령·시행규칙 어디 있나?",
+    "kolaw_baseline": {
+      "accuracy": 7,
+      "logic": 8,
+      "citation": 8,
+      "conciseness": 7,
+      "comment": "기대 키워드·ground truth 모두 언급하나, '발췌에 없음'이라며 직접 답변을 회피한 점이 아쉬움 — 의료법 시행령·시행규칙은 자명한 법령명이므로 더 단정적으로 안내해도 무방",
+      "sum": 30,
+      "keyword_hits": [
+        "시행령",
+        "시행규칙",
+        "보건복지부",
+        "대통령령"
+      ],
+      "keyword_hit_rate": 1.0,
+      "article_hits": [
+        "의료법 시행령",
+        "의료법 시행규칙"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 18669,
+      "scorer_error": null
+    },
+    "pageindex_rlm": {
+      "accuracy": 7,
+      "logic": 8,
+      "citation": 7,
+      "conciseness": 9,
+      "comment": "시행령 조문 인용 충실하나, 대통령령 명시 누락 및 시행규칙 본문 조문 미인용으로 기대 키워드 일부 미충족",
+      "sum": 31,
+      "keyword_hits": [
+        "시행령",
+        "시행규칙",
+        "보건복지부"
+      ],
+      "keyword_hit_rate": 0.75,
+      "article_hits": [
+        "의료법 시행령",
+        "의료법 시행규칙"
+      ],
+      "article_hit_rate": 1.0,
+      "scorer_latency_ms": 18305,
+      "scorer_error": null
+    }
+  }
+]

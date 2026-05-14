@@ -1,0 +1,58 @@
+[
+  {
+    "name_id": "yaksabub",
+    "display": "약사법",
+    "sources": [
+      "법률",
+      "시행령",
+      "시행규칙"
+    ],
+    "nodes": 429,
+    "articles": 392,
+    "max_depth": 5
+  },
+  {
+    "name_id": "minbub",
+    "display": "민법",
+    "sources": [
+      "법률"
+    ],
+    "nodes": 1339,
+    "articles": 1193,
+    "max_depth": 6
+  },
+  {
+    "name_id": "hyungbub",
+    "display": "형법",
+    "sources": [
+      "법률"
+    ],
+    "nodes": 467,
+    "articles": 402,
+    "max_depth": 5
+  },
+  {
+    "name_id": "labor",
+    "display": "근로기준법",
+    "sources": [
+      "법률",
+      "시행령",
+      "시행규칙"
+    ],
+    "nodes": 258,
+    "articles": 235,
+    "max_depth": 4
+  },
+  {
+    "name_id": "jabonsijang",
+    "display": "자본시장과금융투자업에관한법률",
+    "sources": [
+      "법률",
+      "시행령",
+      "시행규칙"
+    ],
+    "nodes": 1372,
+    "articles": 1207,
+    "max_depth": 6
+  }
+]
