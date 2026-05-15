@@ -31,6 +31,10 @@ class SearchRequest(BaseModel):
         ),
     )
     laws: list[str] | None = Field(None, description="특정 law_id 필터 (optional)")
+    law_name: str | None = Field(
+        None,
+        description="법령명 기반 BM25 필터 — 예: '형사소송법'. 지정 시 해당 법령 문서를 우선 검색 (P1-2).",
+    )
     rlm: bool = Field(False, description="Set true to use Phase 3 RLM engine for deep multi-step reasoning")
 
 

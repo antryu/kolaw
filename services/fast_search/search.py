@@ -511,7 +511,8 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
         n_pull = min(_HYBRID_PULL_K, cap)
 
         # Detect canonical law name for boost
-        canonical_law = _detect_law_name(req.query)
+        # P1-2: caller-specified law_name overrides auto-detection
+        canonical_law = req.law_name or _detect_law_name(req.query)
         # If caller passed an explicit req.laws filter, prefer it over query-alias
         # detection. This is what makes /search?laws=[<dir>] actually scope the
         # main success path (previously req.laws was only honored in the grep_search
