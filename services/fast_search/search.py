@@ -528,29 +528,48 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
         keyword = _extract_law_keyword(req.query)
 
         # --- 1. Vector search ---
+        # Blocker 2 fix 2026-05-15: if canonical_law known, add where-metadata filter
+        # so vector results are scoped to the target law itself, not other laws that
+        # merely reference it (e.g. "공소시효" in 아동학대법 citing 형사소송법).
+        law_where = (
+            {"law_folder": {"$eq": canonical_law}}
+            if canonical_law
+            else None
+        )
+
         vector_results = None
         if keyword:
             try:
-                filtered = collection.query(
-                    query_texts=[req.query],
-                    n_results=n_pull,
-                    where_document={"$contains": keyword},
-                )
+                q_kw: dict = {
+                    "query_texts": [req.query],
+                    "n_results": n_pull,
+                    "where_document": {"$contains": keyword},
+                }
+                if law_where:
+                    q_kw["where"] = law_where
+                filtered = collection.query(**q_kw)
                 if filtered.get("ids", [[]])[0]:
                     vector_results = filtered
                     logger.info(
-                        "hybrid vector hit: keyword=%r matched %d chunks",
-                        keyword,
+                        "hybrid vector hit: keyword=%r law_filter=%r matched %d chunks",
+                        keyword, canonical_law,
                         len(filtered["ids"][0]),
                     )
             except Exception as exc:
                 logger.warning("hybrid filtered vector query failed (%s) — unfiltered fallback", exc)
 
         if vector_results is None:
-            vector_results = collection.query(
-                query_texts=[req.query],
-                n_results=n_pull,
-            )
+            try:
+                q_kw2: dict = {"query_texts": [req.query], "n_results": n_pull}
+                if law_where:
+                    q_kw2["where"] = law_where
+                vector_results = collection.query(**q_kw2)
+                # If law filter returned nothing, fall back to unfiltered
+                if not (vector_results.get("ids") or [[]])[0] and law_where:
+                    logger.info("law_where returned 0 docs — falling back to unfiltered vector")
+                    vector_results = collection.query(query_texts=[req.query], n_results=n_pull)
+            except Exception:
+                vector_results = collection.query(query_texts=[req.query], n_results=n_pull)
 
         v_ids = vector_results.get("ids", [[]])[0]
         v_docs = vector_results.get("documents", [[]])[0]
