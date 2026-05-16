@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import time
+from collections import OrderedDict
 
 from apps.api.schemas import Citation, SearchRequest, SearchResponse
 from services.fast_search.ingest import (
@@ -33,6 +34,11 @@ _HYBRID_PULL_K = 20  # candidates pulled from each of vector + BM25 before RRF
 _RRF_K = 60          # standard RRF constant
 _FAST_RERANK_K = 5   # fast mode: limit rerank candidates (latency budget)
 _COLLECTION_CACHE: dict = {}
+
+# --- In-process result cache for fast_search() ---
+_SEARCH_CACHE_TTL = 3600          # seconds (1 hour)
+_SEARCH_CACHE_MAX = 500           # max LRU entries
+_search_cache: OrderedDict = OrderedDict()  # key -> (timestamp, SearchResponse)
 _BM25_TOKENIZER_VERSION = 2  # increment when tokenizer logic changes
 _BM25_CACHE: dict = {}  # {(collection_count, tokenizer_version): ...}
 
@@ -505,6 +511,23 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
       6. LLM rerank (mode=fast: qwen3, mode=deep: Opus 4.7)
       7. Return top _TOP_K as Citations
     """
+    # --- Cache lookup ---
+    _cache_key = (
+        req.query.strip().lower(),
+        req.mode,
+        req.law_name or "",
+        tuple(sorted(req.laws)) if req.laws else (),
+    )
+    _now = time.time()
+    if _cache_key in _search_cache:
+        _ts, _cached = _search_cache[_cache_key]
+        if _now - _ts < _SEARCH_CACHE_TTL:
+            _search_cache.move_to_end(_cache_key)
+            logger.debug("search cache HIT: %r", req.query[:60])
+            return _cached
+        else:
+            del _search_cache[_cache_key]
+
     try:
         collection = _get_collection()
         cap = collection.count()
@@ -676,10 +699,18 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
     else:
         verdict = "does_not_apply"
 
-    return SearchResponse(
+    _result = SearchResponse(
         verdict=verdict,
         confidence=confidence,
         citations=citations,
         trajectory_id=None,
         mode=req.mode,
     )
+
+    # --- Cache store (normal path only) ---
+    _search_cache[_cache_key] = (time.time(), _result)
+    _search_cache.move_to_end(_cache_key)
+    if len(_search_cache) > _SEARCH_CACHE_MAX:
+        _search_cache.popitem(last=False)  # evict oldest (LRU)
+
+    return _result
