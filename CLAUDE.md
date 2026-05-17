@@ -119,3 +119,19 @@ Phase 2: harden with RestrictedPython or Docker isolation.
 - Phase 1 (current): scaffold, stubs, fixture data, 4 tests passing
 - Phase 2 (pending Andrew approval): RLM multi-turn, full legalize-kr index,
   korean-law-mcp wire, beopmang enrichment, sandbox hardening
+
+## 관할 가정 표면화
+
+**원칙**: kolaw 의 default 준거법은 **대한민국 실정법**이다. 외국법이 교차 적용될 가능성을 감지하면 반드시 표면화하라.
+
+**의무 태그 부착 상황**:
+
+| 상황 | 부착 태그 |
+|---|---|
+| 국제 계약 / 준거법 조항 개입 | `[한국법 기준 — 준거법 확인 필요]` |
+| GDPR · 미국 수출규제 등 외국법 교차 적용 가능성 | `[한국법 기준 — 준거법 확인 필요]` |
+| 미국·EU 판례를 국내법 해석에 원용 | `[참고 — 한국법과 다를 수 있음, 외국법 전문가 확인]` |
+| 단일 국내 법령 질의 (명백) | 태그 불필요 |
+
+**배경**: claude-for-legal 가드레일 — "wrong jurisdiction 으로 자신있게 틀리느니 불확실을 플래그하라."
+y-company `runCell` CELL_SYSTEM_PROMPT RULE 8 과 동기화됨.
