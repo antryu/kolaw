@@ -17,6 +17,20 @@ class Citation(BaseModel):
     article: str = Field(..., description="조문 참조, e.g. '§2(7)'")
     version: str = Field(..., description="시행일자 YYYYMMDD, e.g. '20251001'")
     excerpt: str = Field(..., description="원문 발췌 (max 200 chars)")
+    provenance: str = Field(
+        "kolaw-index",
+        description=(
+            "수집 경위(provenance) — 신뢰도 추정이 아니라 인용이 어떻게 수집됐는지 기술. "
+            "kolaw 검색 결과는 전부 인덱스 retrieval 이므로 기본값 'kolaw-index'."
+        ),
+    )
+    verified_date: str = Field(
+        "",
+        description=(
+            "해당 법령의 시행일/확인일 YYYYMMDD — version(시행일자)을 그대로 사용. "
+            "한국법은 시행령·고시가 자주 바뀌어 시행일 명시가 중요. 미상 시 빈 문자열."
+        ),
+    )
 
 
 class SearchRequest(BaseModel):

@@ -489,12 +489,17 @@ def _meta_to_citation(doc: str, meta: dict, score: float) -> Citation:
 
     excerpt = doc[:400].replace("\n", " ") if doc else ""
 
+    version = enforcement_date.replace("-", "") if enforcement_date else ""
     return Citation(
         law_id=law_id,
         law_name=law_name,
         article=article_ref,
-        version=enforcement_date.replace("-", "") if enforcement_date else "",
+        version=version,
         excerpt=excerpt,
+        # provenance: kolaw 검색 결과는 전부 인덱스 retrieval — 기본 "kolaw-index"
+        provenance="kolaw-index",
+        # verified_date: 시행일자(version)를 확인일로 사용
+        verified_date=version,
     )
 
 
@@ -653,6 +658,8 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
                     article=hit.type or "\ubc95\ub839",
                     version="",
                     excerpt=excerpt,
+                    provenance="kolaw-index",
+                    verified_date="",
                 )
             if grep_result.error: logger.warning("grep_search error: %s", grep_result.error)
             grep_citations = [_grep_to_citation(h) for h in grep_result.hits]

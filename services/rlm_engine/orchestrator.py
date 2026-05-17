@@ -500,13 +500,17 @@ def _trajectory_to_response(
     if isinstance(raw, list):
         for item in raw[:10]:
             if isinstance(item, dict):
+                _ver = item.get("version", "")
                 citations.append(
                     Citation(
                         law_id=str(item.get("law_id", "unknown")),
                         law_name=item.get("law_name", ""),
                         article=item.get("article", ""),
-                        version=item.get("version", ""),
+                        version=_ver,
                         excerpt=str(item.get("excerpt", ""))[:300],
+                        # deep mode RLM results are also kolaw-index retrieval
+                        provenance="kolaw-index",
+                        verified_date=_ver,
                     )
                 )
 
@@ -569,6 +573,8 @@ async def deep_search_mock(req: SearchRequest) -> SearchResponse:
             article="§2(7)",
             version="20251001",
             excerpt="[Phase 1 mock] RLM deep search — wire real LLM in Phase 2",
+            provenance="kolaw-index",
+            verified_date="20251001",
         )
     ]
 
