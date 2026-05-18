@@ -8,10 +8,11 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.schemas import (
+    ArticleResponse,
     BatchSearchRequest,
     BatchSearchResponse,
     DataSourceStatus,
@@ -122,6 +123,54 @@ async def search(req: SearchRequest, response: Response) -> SearchResponse:
         return await deep_search(req)
     # Both fast and deep use hybrid retrieval; mode drives the reranker LLM.
     return await fast_search(req)
+
+
+@app.get("/article", response_model=ArticleResponse)
+async def article(
+    response: Response,
+    law: str = Query(..., min_length=1, description="법령명, e.g. '개인정보보호법'"),
+    article: str = Query(
+        ..., min_length=1, alias="article",
+        description="조문 참조, e.g. '제15조' 또는 '제14조의2'",
+    ),
+    type: str = Query(
+        "법률",
+        description="법령 종류 — 법률(기본) / 시행령 / 시행규칙 / 대통령령 / 대법원규칙",
+    ),
+) -> ArticleResponse:
+    """
+    Deterministic per-article lookup — returns one article's verbatim text.
+
+    /search is vector retrieval over document-level chunks and cannot reliably
+    surface a *specific* article's exact text. /article is a pure file parse:
+    it locates the law's folder under the legalize-kr corpus, opens the
+    requested markdown file, splits on 제N조 headings (reusing the existing
+    legalize_kr splitter), and returns the EXACT requested article — its 항/호
+    included — up to the next 제N조 heading, with source-file provenance.
+
+    No embeddings, no vector search. Use /search for "which law is relevant",
+    /article for "give me 제N조 verbatim".
+
+    Returns found=false + error (HTTP 404) when the law or article is missing.
+    """
+    from services.data.article_lookup import lookup_article
+
+    result = lookup_article(law_name=law, article_ref=article, law_type=type)
+    if not result.found:
+        response.status_code = 404
+    return ArticleResponse(
+        found=result.found,
+        law_name=result.law_name,
+        law_id=result.law_id,
+        version=result.version,
+        article=result.article,
+        title=result.title,
+        text=result.text,
+        type=result.type,
+        source_path=result.source_path,
+        provenance="legalize-kr-file",
+        error=result.error,
+    )
 
 
 @app.post("/search/batch", response_model=BatchSearchResponse)

@@ -75,6 +75,39 @@ class BatchSearchResponse(BaseModel):
     results: list[SearchResponse]
 
 
+class ArticleResponse(BaseModel):
+    """
+    Verbatim text of one law article — deterministic file-parse lookup.
+
+    Unlike /search (vector retrieval, document-level chunks), /article is a
+    pure legalize-kr markdown parse: it returns the EXACT requested 제N조 text
+    including its 항/호, with source-file provenance. No embeddings.
+    """
+
+    found: bool = Field(..., description="조문을 찾았으면 true")
+    law_name: str = Field(..., description="법령명 (frontmatter 제목), e.g. '개인정보 보호법'")
+    law_id: str = Field("", description="법령ID, e.g. '011357'")
+    version: str = Field("", description="시행일자 YYYYMMDD, e.g. '20251002'")
+    article: str = Field(..., description="조문 참조 (정규화), e.g. '제15조' / '제14조의2'")
+    title: str = Field("", description="조문 제목, e.g. '(개인정보의 수집ㆍ이용)'")
+    text: str = Field(
+        "",
+        description="조문 원문(verbatim) — 항(①②③)·호(1.2.3.) 포함, 다음 제N조 직전까지.",
+    )
+    type: str = Field("", description="법령 종류 — 법률 / 시행령 / 시행규칙 / ...")
+    source_path: str = Field(
+        "",
+        description="원문 마크다운 파일 절대경로 — provenance(수집 경위).",
+    )
+    provenance: str = Field(
+        "legalize-kr-file",
+        description="수집 경위 — /article 은 항상 legalize-kr 파일 직접 파싱.",
+    )
+    error: str | None = Field(
+        None, description="조문/법령 미발견 시 사람이 읽을 수 있는 사유."
+    )
+
+
 class DataSourceStatus(BaseModel):
     name: str
     status: Literal["ok", "degraded", "unavailable"]
