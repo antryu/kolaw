@@ -47,43 +47,112 @@ _CHAIN_BY_ARTICLE: dict[tuple[str, str, str], dict] | None = None
 _LOAD_LOCK = threading.Lock()
 
 
+def _chromadb_doc_id(
+    index_doc_id: str | None,
+    file_type: str | None,
+    canonical_article: str | None,
+) -> str | None:
+    """
+    Translate a build_index sidecar doc_id to the ChromaDB ingest scheme.
+
+    build_index (`_doc_id_for`) builds ids from the *raw* heading number plus
+    a `_2`/`_3` collision counter for 의M articles, e.g.::
+
+        011357_개인정보보호법_법률_제28조_8     # 제28조의8, the 8th 제28조 heading
+
+    The actual ChromaDB ingest (`ingest_legalize_kr._law_docs`) instead appends
+    the *canonical* article verbatim::
+
+        011357_개인정보보호법_법률_제28조의8
+
+    The two schemes diverged after the v3 collection was ingested, so the
+    sidecar doc_ids no longer key onto the live collection — Phase-2/3
+    delegation-chain enrichment never fired (doc_id lookup always missed).
+
+    Both schemes share the `{law_id}_{folder_slug}_{file_type}_` prefix; only
+    the trailing article token differs. Rebuild the ChromaDB id by keeping the
+    prefix and swapping in the canonical article. Returns the input unchanged
+    when it cannot be parsed (no behaviour change for malformed ids).
+    """
+    if not (index_doc_id and file_type and canonical_article):
+        return index_doc_id
+    token = f"_{file_type}_"
+    idx = index_doc_id.find(token)
+    if idx < 0:
+        return index_doc_id
+    prefix = index_doc_id[:idx]
+    return f"{prefix}_{file_type}_{canonical_article}"
+
+
+def _retag_article_doc_id(art: dict, default_file_type: str) -> dict:
+    """Return a copy of a decree/rule article dict with a ChromaDB-scheme doc_id."""
+    file_type = art.get("file_type", default_file_type)
+    retagged = dict(art)
+    retagged["doc_id"] = _chromadb_doc_id(
+        art.get("doc_id"), file_type, art.get("article")
+    )
+    nested = art.get("rule_articles")
+    if nested:
+        retagged["rule_articles"] = [
+            _retag_article_doc_id(sr, "시행규칙") for sr in nested
+        ]
+    return retagged
+
+
 def _normalize_chain(chain: dict, law_name: str, law_id: str) -> dict:
     """
     Lightly reshape a raw sidecar chain into an API-friendly dict.
 
     Keeps the index structure but adds the owning law's name/id so a caller
-    holding only one chain still knows which law it belongs to.
+    holding only one chain still knows which law it belongs to. All `doc_id`
+    fields are rewritten from the build_index sidecar scheme to the ChromaDB
+    ingest scheme (see `_chromadb_doc_id`) so a search/article hit's doc_id
+    matches, and so `render_delegation_tree`'s ▶ hit marker compares against
+    the same scheme the caller passes in.
     """
     return {
         "law_name": law_name,
         "law_id": law_id,
         "law_article": chain.get("law_article", ""),
-        "law_doc_id": chain.get("law_doc_id", ""),
+        "law_doc_id": _chromadb_doc_id(
+            chain.get("law_doc_id", ""), "법률", chain.get("law_article", "")
+        ),
         "law_title": chain.get("law_title", ""),
         "delegation_kind": chain.get("delegation_kind", []),
         "byeolpyo": chain.get("byeolpyo", []),
-        "decree_articles": chain.get("decree_articles", []),
-        "rule_articles": chain.get("rule_articles", []),
+        "decree_articles": [
+            _retag_article_doc_id(d, "시행령")
+            for d in (chain.get("decree_articles", []) or [])
+        ],
+        "rule_articles": [
+            _retag_article_doc_id(r, "시행규칙")
+            for r in (chain.get("rule_articles", []) or [])
+        ],
     }
 
 
 def _index_chain_members(
-    chain: dict,
     normalized: dict,
     law_id: str,
     by_doc_id: dict[str, dict],
     by_article: dict[tuple[str, str, str], dict],
 ) -> None:
-    """Register every doc_id / (law_id, file_type, article) of `chain`."""
+    """
+    Register every doc_id / (law_id, file_type, article) of a chain.
+
+    Iterates the *normalized* chain — its doc_ids are already rewritten to the
+    ChromaDB scheme (see `_normalize_chain`), so `by_doc_id` keys match the
+    doc_id a search hit carries.
+    """
     # Primary-law article — build_index always parses 법률.md as the primary.
-    law_doc_id = chain.get("law_doc_id")
+    law_doc_id = normalized.get("law_doc_id")
     if law_doc_id:
         by_doc_id.setdefault(law_doc_id, normalized)
-    law_article = chain.get("law_article")
+    law_article = normalized.get("law_article")
     if law_article:
         by_article.setdefault((law_id, "법률", law_article), normalized)
 
-    for decree in chain.get("decree_articles", []) or []:
+    for decree in normalized.get("decree_articles", []) or []:
         d_id = decree.get("doc_id")
         if d_id:
             by_doc_id.setdefault(d_id, normalized)
@@ -102,7 +171,7 @@ def _index_chain_members(
             if sr_article:
                 by_article.setdefault((law_id, sr_ftype, sr_article), normalized)
 
-    for rule in chain.get("rule_articles", []) or []:
+    for rule in normalized.get("rule_articles", []) or []:
         r_id = rule.get("doc_id")
         if r_id:
             by_doc_id.setdefault(r_id, normalized)
@@ -132,7 +201,7 @@ def _build_tables() -> tuple[dict[str, dict], dict[tuple[str, str, str], dict]]:
         law_id = data.get("law_id", "")
         for chain in data.get("delegation_chains", []) or []:
             normalized = _normalize_chain(chain, law_name, law_id)
-            _index_chain_members(chain, normalized, law_id, by_doc_id, by_article)
+            _index_chain_members(normalized, law_id, by_doc_id, by_article)
         loaded += 1
 
     logger.info(
