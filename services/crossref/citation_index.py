@@ -10,7 +10,8 @@ ONE 법령 폴더에 대해
 1. 폴더 안 모든 법령 본문 .md (법률·시행령·시행규칙·대통령령·대법원규칙·각
    부령 등) 의 조문을 _split_articles 로 분리. build_index.py 와 동일하게
    부칙 제거, 의M 위치 복원, doc_id 동일 스킴.
-2. 조문 본문에서 「법령명」[ 제N조[의M][제K항][제K호]] 인용 패턴 추출.
+2. 조문 본문에서 인용 추출 — ① 「법령명」[ 제N조…] 낫표 인용, ② 기본법(六法)
+   맨이름 인용('민법 제339조'처럼 낫표 없는). ②는 닫힌 6법 목록으로만 한정.
 3. 도착 법령명을 코퍼스 폴더로 해소 — 약칭·띄어쓰기·"시행령/시행규칙" 접미사 정규화.
    - 해소되면 target_resolved=true, 도착 폴더·파일 종류 기록.
    - 해소 안 되면(도서관 미보유) target_resolved=false, 법령명·조문만 보존.
@@ -36,6 +37,7 @@ chunk 2/3 에서. 인용 간선은 (폴더, 파일종류, 조문)의 *논리 참
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import re
 import sys
@@ -72,6 +74,18 @@ _CITE_RE = re.compile(
     r"(?:[ \t]*(제\d+조(?:의\d+)?(?:제\d+항)?(?:제\d+호)?))?"
 )
 
+# 기본법(六法) 맨이름 인용 — 낫표 없이 'XX법 제N조' 로 인용하는 닫힌 목록.
+# 오래된 코드(상법·민법 등)는 다른 기본법을 낫표 없이도 인용한다 (의장 (a)
+# 결정 2026-05-19). 일반 법령까지 맨이름으로 잡으면 "이 법 제5조"·"보상법"
+# 같은 오탐이 커서 검증된 6법으로만 한정한다. 낫표 인용은 _CITE_RE 가 담당.
+# 좌측 (?<![가-힣「]): 한글·「 뒤면 제외 — '보상법' 안의 '상법', 낫표 인용
+# 중복을 막는다. 조문 토큰은 필수 (맨이름만 있으면 일반명사 '민법'과 구분 불가).
+_BASIC_LAWS = ("민사소송법", "형사소송법", "민법", "형법", "상법", "헌법")
+_BARE_CITE_RE = re.compile(
+    r"(?<![가-힣「])(" + "|".join(_BASIC_LAWS) + r")"
+    r"[ \t]*(제\d+조(?:의\d+)?(?:제\d+항)?(?:제\d+호)?)"
+)
+
 # 인용 조문 토큰에서 그래프 링크 단위(제N조[의M])만 — 항·호는 버린다.
 _ART_BASE_RE = re.compile(r"(제\d+조(?:의\d+)?)")
 
@@ -96,6 +110,7 @@ _ALIASES = {
     "자본시장법": "자본시장과금융투자업에관한법률",
     "공정거래법": "독점규제및공정거래에관한법률",
     "독점규제법": "독점규제및공정거래에관한법률",
+    "헌법": "대한민국헌법",
 }
 
 # 도착 법령명에서 떼어낼 하위 법령 접미사 → 파일 종류. 긴 것 먼저.
@@ -315,7 +330,13 @@ def build_law_citations(law_folder: str, folder_index: dict[str, str]) -> dict:
 
     for src in _iter_source_articles(law_dir):
         articles_scanned += 1
-        for m in _CITE_RE.finditer(src.content):
+        # 낫표 인용 + 기본법 맨이름 인용을 한 흐름으로 처리 — 두 정규식의
+        # group(1)=법령명, group(2)=조문토큰 구조가 같아 같은 간선 빌더를 탄다.
+        # 같은 (출발, 도착) 간선이면 _CITE_RE·_BARE_CITE_RE 결과는 자연 합산된다.
+        for m in itertools.chain(
+            _CITE_RE.finditer(src.content),
+            _BARE_CITE_RE.finditer(src.content),
+        ):
             raw_name = m.group(1).strip()
             if not raw_name:
                 continue
