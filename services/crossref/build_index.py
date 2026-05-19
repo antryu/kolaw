@@ -1,0 +1,562 @@
+"""
+Delegation cross-reference index builder — Phase 1.
+
+Builds a sidecar JSON index linking a primary law's articles (법률.md) to the
+articles in its 시행령.md / 시행규칙.md that the primary law delegates to, plus
+별표 references. The goal is to recover the 위임(delegation) relationship that
+the flat per-document ChromaDB index drops.
+
+What it does for ONE law folder
+-------------------------------
+1. Split each markdown file (법률 / 시행령 / 시행규칙) into articles, REUSING
+   ``services.data.legalize_kr._split_articles`` — the same regex the ingest
+   pipeline uses.
+2. Restore the ``의M`` suffix positionally. legalize-kr strips ``의M`` from
+   headings (제7조의2 -> 제7조), so the k-th consecutive "제N조" heading is
+   제N조 for k==1, 제N조의2 for k==2, ... This mirrors the logic in
+   ``services.data.article_lookup``.
+3. Exclude the 부칙(附則) section — everything from the first ``부칙`` heading
+   onward is dropped as noise.
+4. From 법률.md extract delegation signals per article:
+   - 대통령령 delegation  ("대통령령으로 정한다" etc.)
+   - 총리령/부령 delegation ("총리령으로 정한다" / "OO부령으로 정한다")
+   - 별표 references       ("별표 1", "별표 2와 같다", ...)
+5. From 시행령.md / 시행규칙.md extract back-references to the primary law
+   ("법 제N조", "법 제N조의M제K항") and to the decree ("영 제N조" — for
+   시행규칙 -> 시행령 links).
+6. Match: a primary-law article that delegates to 대통령령 is linked to every
+   시행령 article whose back-reference points at that primary-law article.
+   Similarly 시행규칙 articles back-referencing 법 제N조 are linked, and the
+   시행규칙 -> 시행령 ("영 제N조") links chain the third tier.
+7. Emit a sidecar JSON index keyed by ChromaDB doc_id (the exact id scheme
+   from ``services.fast_search.ingest_legalize_kr._law_docs``).
+
+별표(別表) — best-effort
+------------------------
+별표 bodies are NOT in the legalize-kr corpus. With ``--byeolpyo`` the builder
+queries law.go.kr's DRF ``licbyl`` SEARCH endpoint (``target=licbyl&search=2``),
+which reliably returns the 별표 *catalogue* — for each 별표: its number, name,
+and the article it is attached to (parsed from "(제N조 관련)" in 별표명). That
+catalogue is matched onto the decree articles. The 별표 *body text* itself is
+served only as an HWP/image attachment behind a JS web page (``lsBylInfoP.do``),
+not as DRF API data — so bodies are left unresolved in Phase 1 (see report).
+
+This is Phase 1: builder + single-law verification. No API wiring, no UI.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import unicodedata
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# Make the kolaw repo root importable when run as a script.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from services.data.legalize_kr import (  # noqa: E402
+    _CORPUS_PATH,
+    _parse_frontmatter,
+    _split_articles,
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Regexes
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 부칙 section heading — everything from here on is dropped.
+_BUCHIK_RE = re.compile(r"^#{1,6}\s*부칙", re.MULTILINE)
+
+# Delegation signals inside the primary law (per-article body text).
+# 대통령령 — "대통령령으로 정한다 / 정하는 / 정한 ..."
+_DELEG_PRESIDENTIAL_RE = re.compile(r"대통령령으로\s*정")
+# 총리령 / OO부령 — "총리령으로 정한다", "행정안전부령으로 정한다", ...
+_DELEG_MINISTERIAL_RE = re.compile(r"(?:총리령|[가-힣]*부령)으로\s*정")
+# 별표 N — "별표 1", "별표 12와 같다"
+_BYEOLPYO_RE = re.compile(r"별표\s*(\d+)")
+# 별지 서식 — "별지 제1호서식"
+_BYEOLJI_RE = re.compile(r"별지\s*제?\s*(\d+)\s*호?\s*서식")
+
+# Back-reference inside 시행령 / 시행규칙: "법 제15조", "법 제28조의8제2항".
+# group(1)=base number, group(2)=의M (optional), group(3)=제K항 (optional)
+_BACKREF_LAW_RE = re.compile(
+    r"법\s*제(\d+)조(?:의(\d+))?(?:제(\d+)항)?"
+)
+# Back-reference to the 시행령 itself, used by 시행규칙: "영 제5조".
+_BACKREF_DECREE_RE = re.compile(
+    r"영\s*제(\d+)조(?:의(\d+))?(?:제(\d+)항)?"
+)
+
+# "(제32조제4항 관련)" inside a 별표명 — the article the 별표 is attached to.
+_BYEOLPYO_ATTACH_RE = re.compile(r"제(\d+)조(?:의(\d+))?")
+
+# law.go.kr DRF API — licbyl(별표서식) catalogue search.
+_DRF_OC = "Hydrogen"
+_DRF_LICBYL_SEARCH = "https://www.law.go.kr/DRF/lawSearch.do"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data model
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class IndexedArticle:
+    """One article of one markdown file, with delegation/back-ref signals."""
+
+    file_type: str          # 법률 / 시행령 / 시행규칙 / ...
+    doc_id: str             # ChromaDB doc id (raw, 의M stripped — matches ingest)
+    canonical: str          # human-readable ref, 의M restored — e.g. 제28조의8
+    raw_number: str         # bare heading number, 의M stripped — e.g. 제28조
+    title: str              # e.g. "(개인정보의 국외 이전)"
+    # delegation signals (primary law only, but harmless on decree files)
+    delegates_presidential: bool = False
+    delegates_ministerial: bool = False
+    byeolpyo_refs: list[int] = field(default_factory=list)
+    byeolji_refs: list[int] = field(default_factory=list)
+    # back-references (decree files): list of (base, eui, hang) tuples
+    law_backrefs: list[tuple[int, int, int | None]] = field(default_factory=list)
+    decree_backrefs: list[tuple[int, int, int | None]] = field(default_factory=list)
+
+
+@dataclass
+class DelegationChain:
+    """A primary-law article and what it delegates down to."""
+
+    law_article: str                       # canonical primary-law ref
+    law_doc_id: str
+    law_title: str
+    delegation_kind: list[str]              # e.g. ["대통령령", "별표"]
+    decree_articles: list[dict] = field(default_factory=list)   # 시행령 links
+    rule_articles: list[dict] = field(default_factory=list)     # 시행규칙 links
+    byeolpyo: list[int] = field(default_factory=list)           # 별표 numbers
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Parsing helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _strip_buchik(text: str) -> str:
+    """Drop the 부칙(附則) section: everything from the first 부칙 heading on."""
+    m = _BUCHIK_RE.search(text)
+    return text[: m.start()] if m else text
+
+
+def _restore_eui(numbers: list[str]) -> list[str]:
+    """
+    Positionally restore the 의M suffix on a sequence of bare 제N조 numbers.
+
+    legalize-kr strips 의M from headings, so 제7조 / 제7조의2 / 제7조의3 all
+    appear as bare "제7조". Korean statutes place 의-articles right after their
+    base article in order, so the k-th consecutive identical "제N조" is
+    제N조 for k==1, 제N조의2 for k==2, ...  Mirrors article_lookup.py.
+    """
+    seen: dict[str, int] = {}
+    out: list[str] = []
+    for num in numbers:
+        seen[num] = seen.get(num, 0) + 1
+        k = seen[num]
+        out.append(num if k == 1 else f"{num}의{k}")
+    return out
+
+
+def _doc_id_for(
+    law_id: str, folder_slug: str, file_type: str, raw_number: str,
+    used: set[str],
+) -> str:
+    """
+    Reproduce the doc_id scheme of ingest_legalize_kr._law_docs:
+        base = f"{law_id}_{folder_slug}_{file_type}_{raw_number}"
+    On collision (same raw 제N조 appears again — i.e. an 의M article) append
+    _2, _3, ...  ``used`` is mutated to track ids already emitted.
+    """
+    base = f"{law_id}_{folder_slug}_{file_type}_{raw_number}"
+    if base not in used:
+        used.add(base)
+        return base
+    suffix = 2
+    while f"{base}_{suffix}" in used:
+        suffix += 1
+    doc_id = f"{base}_{suffix}"
+    used.add(doc_id)
+    return doc_id
+
+
+def _index_file(md_path: Path, is_primary: bool) -> tuple[list[IndexedArticle], dict]:
+    """
+    Parse one markdown file into a list of IndexedArticle, with delegation /
+    back-reference signals filled in. Returns (articles, frontmatter_meta).
+    """
+    text = md_path.read_text(encoding="utf-8")
+    meta = _parse_frontmatter(text)
+    body = _strip_buchik(text)
+
+    file_type = md_path.stem  # 법률 / 시행령 / 시행규칙 / ...
+    law_id = meta.get("법령ID", "") or f"folder_{hash(md_path.parent.name) & 0xFFFFFF:06x}"
+    folder_slug = md_path.parent.name[:20].replace(" ", "_")
+
+    raw_articles = _split_articles(body)
+    raw_numbers = [a.number for a in raw_articles]
+    canon_numbers = _restore_eui(raw_numbers)
+
+    used_ids: set[str] = set()
+    indexed: list[IndexedArticle] = []
+    for art, canon in zip(raw_articles, canon_numbers):
+        doc_id = _doc_id_for(law_id, folder_slug, file_type, art.number, used_ids)
+        ia = IndexedArticle(
+            file_type=file_type,
+            doc_id=doc_id,
+            canonical=canon,
+            raw_number=art.number,
+            title=art.title,
+        )
+        if is_primary:
+            ia.delegates_presidential = bool(_DELEG_PRESIDENTIAL_RE.search(art.content))
+            ia.delegates_ministerial = bool(_DELEG_MINISTERIAL_RE.search(art.content))
+            ia.byeolpyo_refs = sorted(
+                {int(n) for n in _BYEOLPYO_RE.findall(art.content)}
+            )
+            ia.byeolji_refs = sorted(
+                {int(n) for n in _BYEOLJI_RE.findall(art.content)}
+            )
+        else:
+            # decree file: extract back-references
+            for m in _BACKREF_LAW_RE.finditer(art.content):
+                base = int(m.group(1))
+                eui = int(m.group(2)) if m.group(2) else 1
+                hang = int(m.group(3)) if m.group(3) else None
+                ia.law_backrefs.append((base, eui, hang))
+            for m in _BACKREF_DECREE_RE.finditer(art.content):
+                base = int(m.group(1))
+                eui = int(m.group(2)) if m.group(2) else 1
+                hang = int(m.group(3)) if m.group(3) else None
+                ia.decree_backrefs.append((base, eui, hang))
+            # also detect 별표 refs inside the decree (for chain completeness)
+            ia.byeolpyo_refs = sorted(
+                {int(n) for n in _BYEOLPYO_RE.findall(art.content)}
+            )
+        indexed.append(ia)
+
+    return indexed, meta
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Index assembly
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _canonical_to_articles(articles: list[IndexedArticle]) -> dict[str, IndexedArticle]:
+    """Map canonical ref (제28조의8) -> IndexedArticle for fast lookup."""
+    return {a.canonical: a for a in articles}
+
+
+def _article_brief(a: IndexedArticle) -> dict:
+    """Compact dict for an article inside a chain."""
+    return {
+        "doc_id": a.doc_id,
+        "article": a.canonical,
+        "title": a.title,
+        "file_type": a.file_type,
+    }
+
+
+def fetch_byeolpyo_catalogue(law_name: str) -> tuple[list[dict], str | None]:
+    """
+    Best-effort: fetch the 별표(別表) catalogue for a law from law.go.kr.
+
+    Uses the DRF ``licbyl`` SEARCH endpoint with ``search=2`` (search by 법령명).
+    Returns (entries, error). Each entry:
+        {별표번호, 별표종류, 별표명, 관련법령명, 관련법령ID, 별표일련번호,
+         attached_article}  — attached_article is the 제N조(의M) parsed from
+        the "(제N조 관련)" suffix in 별표명, or "" if not parseable.
+
+    The 별표 *body* text is NOT fetched — law.go.kr serves it only as an
+    HWP/image attachment behind a JS page, not as DRF API data.
+    """
+    query = urllib.parse.quote(unicodedata.normalize("NFC", law_name).replace(" ", ""))
+    url = (
+        f"{_DRF_LICBYL_SEARCH}?OC={_DRF_OC}&target=licbyl&type=XML"
+        f"&search=2&query={query}&display=100"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except Exception as exc:  # noqa: BLE001
+        return [], f"licbyl API 호출 실패: {exc}"
+
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        return [], f"licbyl XML 파싱 실패: {exc}"
+
+    if (root.findtext("resultCode") or "").strip() not in ("00", ""):
+        return [], f"licbyl resultMsg: {root.findtext('resultMsg')}"
+
+    entries: list[dict] = []
+    for el in root.findall("licbyl"):
+        g = lambda t: (el.findtext(t) or "").strip()  # noqa: E731
+        name = g("별표명")
+        attached = ""
+        m = _BYEOLPYO_ATTACH_RE.search(name)
+        if m:
+            base, eui = m.group(1), m.group(2)
+            attached = f"제{base}조" if not eui else f"제{base}조의{eui}"
+        entries.append({
+            "별표번호": g("별표번호"),
+            "별표종류": g("별표종류"),
+            "별표명": name,
+            "관련법령명": g("관련법령명"),
+            "관련법령ID": g("관련법령ID"),
+            "별표일련번호": g("별표일련번호"),
+            "attached_article": attached,
+        })
+    return entries, None
+
+
+def build_law_index(law_folder: str, fetch_byeolpyo: bool = False) -> dict:
+    """
+    Build the delegation cross-reference index for ONE law folder.
+
+    Args:
+        law_folder: folder name under the legalize-kr corpus, e.g.
+                    "개인정보보호법" (spaces tolerated; NFC-folded).
+
+    Returns:
+        A JSON-serializable dict — the sidecar index for this law.
+    """
+    target = unicodedata.normalize("NFC", law_folder).replace(" ", "").strip()
+    law_dir: Path | None = None
+    direct = _CORPUS_PATH / target
+    if direct.is_dir():
+        law_dir = direct
+    else:
+        for entry in _CORPUS_PATH.iterdir():
+            if entry.is_dir() and (
+                unicodedata.normalize("NFC", entry.name).replace(" ", "") == target
+            ):
+                law_dir = entry
+                break
+    if law_dir is None:
+        raise FileNotFoundError(
+            f"법령 폴더를 찾을 수 없습니다: '{law_folder}' (corpus: {_CORPUS_PATH})"
+        )
+
+    primary_md = law_dir / "법률.md"
+    if not primary_md.exists():
+        raise FileNotFoundError(f"법률.md 없음: {law_dir}")
+    decree_md = law_dir / "시행령.md"
+    rule_md = law_dir / "시행규칙.md"
+
+    primary_articles, primary_meta = _index_file(primary_md, is_primary=True)
+    decree_articles: list[IndexedArticle] = []
+    rule_articles: list[IndexedArticle] = []
+    if decree_md.exists():
+        decree_articles, _ = _index_file(decree_md, is_primary=False)
+    if rule_md.exists():
+        rule_articles, _ = _index_file(rule_md, is_primary=False)
+
+    primary_by_canon = _canonical_to_articles(primary_articles)
+    decree_by_canon = _canonical_to_articles(decree_articles)
+
+    # Build: primary-law canonical -> list of decree articles back-referencing it.
+    # We match on (base, eui), ignoring the 제K항 granularity for the chain link.
+    decree_for_law: dict[str, list[IndexedArticle]] = {}
+    for d in decree_articles:
+        for base, eui, _hang in d.law_backrefs:
+            ref = f"제{base}조" if eui == 1 else f"제{base}조의{eui}"
+            decree_for_law.setdefault(ref, []).append(d)
+
+    # 시행규칙 -> 법: which 법률 article each 시행규칙 article points to.
+    rule_for_law: dict[str, list[IndexedArticle]] = {}
+    # 시행규칙 -> 영: which 시행령 article each 시행규칙 article points to.
+    rule_for_decree: dict[str, list[IndexedArticle]] = {}
+    for r in rule_articles:
+        for base, eui, _hang in r.law_backrefs:
+            ref = f"제{base}조" if eui == 1 else f"제{base}조의{eui}"
+            rule_for_law.setdefault(ref, []).append(r)
+        for base, eui, _hang in r.decree_backrefs:
+            ref = f"제{base}조" if eui == 1 else f"제{base}조의{eui}"
+            rule_for_decree.setdefault(ref, []).append(r)
+
+    # Assemble chains for every primary-law article that delegates downward.
+    chains: list[DelegationChain] = []
+    for pa in primary_articles:
+        linked_decree = decree_for_law.get(pa.canonical, [])
+        linked_rule = rule_for_law.get(pa.canonical, [])
+        kinds: list[str] = []
+        if pa.delegates_presidential:
+            kinds.append("대통령령")
+        if pa.delegates_ministerial:
+            kinds.append("총리령·부령")
+        if pa.byeolpyo_refs:
+            kinds.append("별표")
+        # Only emit a chain if there is a delegation signal OR a real back-link.
+        if not (kinds or linked_decree or linked_rule):
+            continue
+
+        # de-dup linked articles by doc_id (an article may back-ref the same
+        # 법 조 in multiple 항)
+        seen_d: set[str] = set()
+        decree_briefs: list[dict] = []
+        for d in linked_decree:
+            if d.doc_id in seen_d:
+                continue
+            seen_d.add(d.doc_id)
+            brief = _article_brief(d)
+            # if this 시행령 article is itself pointed at by a 시행규칙 article,
+            # chain the third tier under it
+            sub_rules = rule_for_decree.get(d.canonical, [])
+            if sub_rules:
+                seen_sr: set[str] = set()
+                brief["rule_via_decree"] = [
+                    _article_brief(sr) for sr in sub_rules
+                    if not (sr.doc_id in seen_sr or seen_sr.add(sr.doc_id))
+                ]
+            decree_briefs.append(brief)
+
+        seen_r: set[str] = set()
+        rule_briefs = [
+            _article_brief(r) for r in linked_rule
+            if not (r.doc_id in seen_r or seen_r.add(r.doc_id))
+        ]
+
+        chains.append(
+            DelegationChain(
+                law_article=pa.canonical,
+                law_doc_id=pa.doc_id,
+                law_title=pa.title,
+                delegation_kind=kinds,
+                decree_articles=decree_briefs,
+                rule_articles=rule_briefs,
+                byeolpyo=pa.byeolpyo_refs,
+            )
+        )
+
+    # Decree-side 별표 references (aggregate, for the byeolpyo branch).
+    decree_byeolpyo: dict[str, list[int]] = {}
+    for d in decree_articles:
+        if d.byeolpyo_refs:
+            decree_byeolpyo[d.canonical] = d.byeolpyo_refs
+
+    # 별표 catalogue (best-effort, law.go.kr licbyl) — body text not fetched.
+    byeolpyo_catalogue: list[dict] = []
+    byeolpyo_error: str | None = "별표 조회 안 함 (--byeolpyo 미지정)"
+    if fetch_byeolpyo:
+        law_display = primary_meta.get("제목", law_dir.name)
+        byeolpyo_catalogue, byeolpyo_error = fetch_byeolpyo_catalogue(law_display)
+
+    index = {
+        "schema": "kolaw-crossref/v1",
+        "law_folder": law_dir.name,
+        "law_name": primary_meta.get("제목", law_dir.name),
+        "law_id": primary_meta.get("법령ID", ""),
+        "enforcement_date": primary_meta.get("시행일자", "").replace("-", ""),
+        "files": {
+            "법률": str(primary_md),
+            "시행령": str(decree_md) if decree_md.exists() else None,
+            "시행규칙": str(rule_md) if rule_md.exists() else None,
+        },
+        "counts": {
+            "law_articles": len(primary_articles),
+            "decree_articles": len(decree_articles),
+            "rule_articles": len(rule_articles),
+            "delegation_chains": len(chains),
+            "law_articles_delegating_presidential": sum(
+                1 for a in primary_articles if a.delegates_presidential
+            ),
+            "law_articles_delegating_ministerial": sum(
+                1 for a in primary_articles if a.delegates_ministerial
+            ),
+            "law_byeolpyo_refs": sorted(
+                {n for a in primary_articles for n in a.byeolpyo_refs}
+            ),
+            "decree_byeolpyo_refs": sorted(
+                {n for nums in decree_byeolpyo.values() for n in nums}
+            ),
+        },
+        "delegation_chains": [
+            {
+                "law_article": c.law_article,
+                "law_doc_id": c.law_doc_id,
+                "law_title": c.law_title,
+                "delegation_kind": c.delegation_kind,
+                "byeolpyo": c.byeolpyo,
+                "decree_articles": c.decree_articles,
+                "rule_articles": c.rule_articles,
+            }
+            for c in chains
+        ],
+        "decree_byeolpyo_refs": decree_byeolpyo,
+        # 별표 catalogue from law.go.kr licbyl (best-effort): number, name and
+        # the article each 별표 is attached to. Body text is NOT included —
+        # law.go.kr serves 별표 bodies only as HWP/image attachments.
+        "byeolpyo_catalogue": byeolpyo_catalogue,
+        "byeolpyo_error": byeolpyo_error,
+    }
+    return index
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Build delegation cross-reference index for one law folder."
+    )
+    parser.add_argument(
+        "law_folder",
+        help="법령 폴더명 (legalize-kr corpus), e.g. 개인정보보호법",
+    )
+    parser.add_argument(
+        "-o", "--out",
+        type=Path,
+        default=None,
+        help="출력 JSON 경로 (기본: services/crossref/index/<folder>.json)",
+    )
+    parser.add_argument(
+        "--byeolpyo",
+        action="store_true",
+        help="law.go.kr licbyl 에서 별표 목록 best-effort 수집 (네트워크 필요)",
+    )
+    args = parser.parse_args()
+
+    index = build_law_index(args.law_folder, fetch_byeolpyo=args.byeolpyo)
+
+    out_path = args.out
+    if out_path is None:
+        out_dir = Path(__file__).resolve().parent / "index"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{index['law_folder']}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    c = index["counts"]
+    print(f"[crossref] {index['law_name']} ({index['law_folder']})")
+    print(f"  법률 {c['law_articles']}조 / 시행령 {c['decree_articles']}조 "
+          f"/ 시행규칙 {c['rule_articles']}조")
+    print(f"  위임 체인 {c['delegation_chains']}개 "
+          f"(대통령령 위임 {c['law_articles_delegating_presidential']}조, "
+          f"총리령·부령 위임 {c['law_articles_delegating_ministerial']}조)")
+    print(f"  별표 참조 — 본법 {c['law_byeolpyo_refs']} / 시행령 {c['decree_byeolpyo_refs']}")
+    cat = index["byeolpyo_catalogue"]
+    if cat:
+        print(f"  별표 목록 (law.go.kr licbyl): {len(cat)}건")
+        for b in cat:
+            print(f"    [{b['별표번호']}] {b['별표명']} "
+                  f"→ {b['attached_article'] or '(조문 미파싱)'} ({b['관련법령명']})")
+    elif index["byeolpyo_error"]:
+        print(f"  별표 목록: {index['byeolpyo_error']}")
+    print(f"  -> {out_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
