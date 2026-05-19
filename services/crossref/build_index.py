@@ -41,6 +41,16 @@ catalogue is matched onto the decree articles. The 별표 *body text* itself is
 served only as an HWP/image attachment behind a JS web page (``lsBylInfoP.do``),
 not as DRF API data — so bodies are left unresolved in Phase 1 (see report).
 
+별표 numbering
+~~~~~~~~~~~~~~
+The corpus body cites 별표 as ``별표 2`` / ``별표 7의2`` (ordinal + optional
+의M). law.go.kr's licbyl ``별표번호`` is a fixed 6-digit code: the first 4
+digits are the ordinal number, the last 2 are the 의M suffix (``00`` = none).
+``000200`` -> 별표 2, ``000702`` -> 별표 7의2. Both are normalized to the same
+canonical token (e.g. ``"7의2"``) so the corpus reference and the licbyl
+catalogue entry line up. ``search=2`` returns 별표 for *every* law whose name
+matches and across decree levels, so entries are filtered by 관련법령명.
+
 This is Phase 1: builder + single-law verification. No API wiring, no UI.
 """
 
@@ -50,6 +60,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import unicodedata
 import urllib.parse
 import urllib.request
@@ -73,6 +84,12 @@ from services.data.legalize_kr import (  # noqa: E402
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 부칙 section heading — everything from here on is dropped.
+# Verified across the 5 sample laws x {법률,시행령,시행규칙}: the 부칙 section
+# always opens with a level-2 heading "## 부칙". The body text of ordinary
+# articles also mentions "부칙" (e.g. "...일부개정법률 부칙 제15조..."), but
+# those are never at line-start behind a "#" run, so anchoring with
+# ^#{1,6}\s* keeps them out. .search() takes the FIRST such heading, which is
+# the real 부칙 boundary.
 _BUCHIK_RE = re.compile(r"^#{1,6}\s*부칙", re.MULTILINE)
 
 # Delegation signals inside the primary law (per-article body text).
@@ -80,10 +97,12 @@ _BUCHIK_RE = re.compile(r"^#{1,6}\s*부칙", re.MULTILINE)
 _DELEG_PRESIDENTIAL_RE = re.compile(r"대통령령으로\s*정")
 # 총리령 / OO부령 — "총리령으로 정한다", "행정안전부령으로 정한다", ...
 _DELEG_MINISTERIAL_RE = re.compile(r"(?:총리령|[가-힣]*부령)으로\s*정")
-# 별표 N — "별표 1", "별표 12와 같다"
-_BYEOLPYO_RE = re.compile(r"별표\s*(\d+)")
-# 별지 서식 — "별지 제1호서식"
-_BYEOLJI_RE = re.compile(r"별지\s*제?\s*(\d+)\s*호?\s*서식")
+# 별표 N(의M) — "별표 1", "별표 12와 같다", "별표 7의2". group(1)=ordinal,
+# group(2)=의M suffix (optional). The 의M MUST be captured: the corpus cites
+# 별표 7의2 distinctly from 별표 7.
+_BYEOLPYO_RE = re.compile(r"별표\s*(\d+)(?:의(\d+))?")
+# 별지 서식 — "별지 제1호서식", "별지 제2호의2서식"
+_BYEOLJI_RE = re.compile(r"별지\s*제?\s*(\d+)(?:의(\d+))?\s*호?\s*서식")
 
 # Back-reference inside 시행령 / 시행규칙: "법 제15조", "법 제28조의8제2항".
 # group(1)=base number, group(2)=의M (optional), group(3)=제K항 (optional)
@@ -101,6 +120,73 @@ _BYEOLPYO_ATTACH_RE = re.compile(r"제(\d+)조(?:의(\d+))?")
 # law.go.kr DRF API — licbyl(별표서식) catalogue search.
 _DRF_OC = "Hydrogen"
 _DRF_LICBYL_SEARCH = "https://www.law.go.kr/DRF/lawSearch.do"
+# Polite delay (seconds) between consecutive licbyl HTTP calls — keeps the
+# full 2,302-law expansion under law.go.kr's rate limit.
+_LICBYL_SLEEP = 0.7
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 별표 numbering helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _byeolpyo_token(base: int, eui: int | None) -> str:
+    """Canonical 별표 token: 2 -> '2', (7, 2) -> '7의2'."""
+    return str(base) if not eui else f"{base}의{eui}"
+
+
+def _decode_licbyl_no(code: str) -> str | None:
+    """
+    Decode a law.go.kr licbyl ``별표번호`` 6-digit code to a canonical token.
+
+    The code is ``NNNNMM``: the first 4 digits are the ordinal 별표/서식
+    number, the last 2 are the 의M suffix (``00`` = no suffix).
+        '000200' -> '2'
+        '000702' -> '7의2'
+        '001204' -> '12의4'
+    Returns None if the code is not a parseable 6-digit string.
+    """
+    code = (code or "").strip()
+    if not (len(code) == 6 and code.isdigit()):
+        return None
+    base = int(code[:4])
+    eui = int(code[4:])
+    if base == 0:
+        return None
+    return _byeolpyo_token(base, eui or None)
+
+
+def _norm_law_name(name: str) -> str:
+    """NFC-fold and strip spaces — for comparing 법령명 across sources."""
+    return unicodedata.normalize("NFC", name or "").replace(" ", "").strip()
+
+
+def _byeolpyo_tokens(text: str) -> list[str]:
+    """Extract sorted, de-duplicated 별표 tokens from a block of text."""
+    found = {
+        _byeolpyo_token(int(b), int(e) if e else None)
+        for b, e in _BYEOLPYO_RE.findall(text)
+    }
+    return _sorted_byeolpyo(found)
+
+
+def _byeolji_tokens(text: str) -> list[str]:
+    """Extract sorted, de-duplicated 별지서식 tokens from a block of text."""
+    found = {
+        _byeolpyo_token(int(b), int(e) if e else None)
+        for b, e in _BYEOLJI_RE.findall(text)
+    }
+    return _sorted_byeolpyo(found)
+
+
+def _sorted_byeolpyo(tokens: set[str]) -> list[str]:
+    """Sort 별표 tokens numerically: 2 < 7 < 7의2 < 12."""
+    def key(tok: str) -> tuple[int, int]:
+        if "의" in tok:
+            b, e = tok.split("의", 1)
+            return int(b), int(e)
+        return int(tok), 0
+    return sorted(tokens, key=key)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,8 +206,9 @@ class IndexedArticle:
     # delegation signals (primary law only, but harmless on decree files)
     delegates_presidential: bool = False
     delegates_ministerial: bool = False
-    byeolpyo_refs: list[int] = field(default_factory=list)
-    byeolji_refs: list[int] = field(default_factory=list)
+    # 별표/별지 tokens with the 의M suffix preserved — "2", "7의2", ...
+    byeolpyo_refs: list[str] = field(default_factory=list)
+    byeolji_refs: list[str] = field(default_factory=list)
     # back-references (decree files): list of (base, eui, hang) tuples
     law_backrefs: list[tuple[int, int, int | None]] = field(default_factory=list)
     decree_backrefs: list[tuple[int, int, int | None]] = field(default_factory=list)
@@ -137,7 +224,7 @@ class DelegationChain:
     delegation_kind: list[str]              # e.g. ["대통령령", "별표"]
     decree_articles: list[dict] = field(default_factory=list)   # 시행령 links
     rule_articles: list[dict] = field(default_factory=list)     # 시행규칙 links
-    byeolpyo: list[int] = field(default_factory=list)           # 별표 numbers
+    byeolpyo: list[str] = field(default_factory=list)           # 별표 tokens
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -222,12 +309,8 @@ def _index_file(md_path: Path, is_primary: bool) -> tuple[list[IndexedArticle], 
         if is_primary:
             ia.delegates_presidential = bool(_DELEG_PRESIDENTIAL_RE.search(art.content))
             ia.delegates_ministerial = bool(_DELEG_MINISTERIAL_RE.search(art.content))
-            ia.byeolpyo_refs = sorted(
-                {int(n) for n in _BYEOLPYO_RE.findall(art.content)}
-            )
-            ia.byeolji_refs = sorted(
-                {int(n) for n in _BYEOLJI_RE.findall(art.content)}
-            )
+            ia.byeolpyo_refs = _byeolpyo_tokens(art.content)
+            ia.byeolji_refs = _byeolji_tokens(art.content)
         else:
             # decree file: extract back-references
             for m in _BACKREF_LAW_RE.finditer(art.content):
@@ -241,9 +324,8 @@ def _index_file(md_path: Path, is_primary: bool) -> tuple[list[IndexedArticle], 
                 hang = int(m.group(3)) if m.group(3) else None
                 ia.decree_backrefs.append((base, eui, hang))
             # also detect 별표 refs inside the decree (for chain completeness)
-            ia.byeolpyo_refs = sorted(
-                {int(n) for n in _BYEOLPYO_RE.findall(art.content)}
-            )
+            ia.byeolpyo_refs = _byeolpyo_tokens(art.content)
+            ia.byeolji_refs = _byeolji_tokens(art.content)
         indexed.append(ia)
 
     return indexed, meta
@@ -269,30 +351,13 @@ def _article_brief(a: IndexedArticle) -> dict:
     }
 
 
-def fetch_byeolpyo_catalogue(law_name: str) -> tuple[list[dict], str | None]:
-    """
-    Best-effort: fetch the 별표(別表) catalogue for a law from law.go.kr.
+def _licbyl_cache_path() -> Path:
+    """Sidecar cache directory for licbyl responses (one file per law name)."""
+    return Path(__file__).resolve().parent / "cache" / "licbyl"
 
-    Uses the DRF ``licbyl`` SEARCH endpoint with ``search=2`` (search by 법령명).
-    Returns (entries, error). Each entry:
-        {별표번호, 별표종류, 별표명, 관련법령명, 관련법령ID, 별표일련번호,
-         attached_article}  — attached_article is the 제N조(의M) parsed from
-        the "(제N조 관련)" suffix in 별표명, or "" if not parseable.
 
-    The 별표 *body* text is NOT fetched — law.go.kr serves it only as an
-    HWP/image attachment behind a JS page, not as DRF API data.
-    """
-    query = urllib.parse.quote(unicodedata.normalize("NFC", law_name).replace(" ", ""))
-    url = (
-        f"{_DRF_LICBYL_SEARCH}?OC={_DRF_OC}&target=licbyl&type=XML"
-        f"&search=2&query={query}&display=100"
-    )
-    try:
-        with urllib.request.urlopen(url, timeout=20) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-    except Exception as exc:  # noqa: BLE001
-        return [], f"licbyl API 호출 실패: {exc}"
-
+def _parse_licbyl_xml(raw: str) -> tuple[list[dict], str | None]:
+    """Parse a licbyl SEARCH XML payload into catalogue entries."""
     try:
         root = ET.fromstring(raw)
     except ET.ParseError as exc:
@@ -310,8 +375,12 @@ def fetch_byeolpyo_catalogue(law_name: str) -> tuple[list[dict], str | None]:
         if m:
             base, eui = m.group(1), m.group(2)
             attached = f"제{base}조" if not eui else f"제{base}조의{eui}"
+        raw_no = g("별표번호")
         entries.append({
-            "별표번호": g("별표번호"),
+            "별표번호": raw_no,
+            # canonical token decoded from the 6-digit code — lines up with
+            # the corpus body's "별표 N(의M)" reference.
+            "별표": _decode_licbyl_no(raw_no),
             "별표종류": g("별표종류"),
             "별표명": name,
             "관련법령명": g("관련법령명"),
@@ -322,13 +391,92 @@ def fetch_byeolpyo_catalogue(law_name: str) -> tuple[list[dict], str | None]:
     return entries, None
 
 
-def build_law_index(law_folder: str, fetch_byeolpyo: bool = False) -> dict:
+def fetch_byeolpyo_catalogue(
+    law_name: str,
+    related_law_names: list[str] | None = None,
+    use_cache: bool = True,
+) -> tuple[list[dict], str | None]:
+    """
+    Best-effort: fetch the 별표(別表) catalogue for a law from law.go.kr.
+
+    Uses the DRF ``licbyl`` SEARCH endpoint with ``search=2`` (search by 법령명).
+    Returns (entries, error). Each entry:
+        {별표번호, 별표, 별표종류, 별표명, 관련법령명, 관련법령ID, 별표일련번호,
+         attached_article}
+      - 별표      : canonical token decoded from the 6-digit 별표번호
+                    ("000702" -> "7의2"), or None if not decodable.
+      - attached_article : the 제N조(의M) parsed from the "(제N조 관련)"
+                    suffix in 별표명, or "" if not parseable.
+
+    A single ``search=2`` query returns 별표 for *every* law whose name
+    matches the query and across decree levels. ``related_law_names`` (the
+    NFC-folded law/decree/rule display names of THIS law) filters the result
+    down to entries that actually belong to this law; pass None to keep all.
+
+    Responses are cached under ``services/crossref/cache/licbyl/`` keyed by the
+    NFC-folded law name — each law is fetched from law.go.kr at most once.
+    Between live HTTP calls the function sleeps ``_LICBYL_SLEEP`` seconds so
+    the full 2,302-law expansion stays within law.go.kr's rate limit.
+
+    The 별표 *body* text is NOT fetched — law.go.kr serves it only as an
+    HWP/image attachment behind a JS page, not as DRF API data.
+    """
+    folded = _norm_law_name(law_name)
+    cache_file = _licbyl_cache_path() / f"{folded}.xml"
+
+    raw: str | None = None
+    if use_cache and cache_file.exists():
+        try:
+            raw = cache_file.read_text(encoding="utf-8")
+        except OSError:
+            raw = None
+
+    if raw is None:
+        query = urllib.parse.quote(folded)
+        url = (
+            f"{_DRF_LICBYL_SEARCH}?OC={_DRF_OC}&target=licbyl&type=XML"
+            f"&search=2&query={query}&display=100"
+        )
+        try:
+            with urllib.request.urlopen(url, timeout=20) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+        except Exception as exc:  # noqa: BLE001
+            return [], f"licbyl API 호출 실패: {exc}"
+        finally:
+            # polite delay after every live call (skipped on cache hit)
+            time.sleep(_LICBYL_SLEEP)
+        if use_cache:
+            try:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(raw, encoding="utf-8")
+            except OSError:
+                pass  # caching is best-effort; a write failure is non-fatal
+
+    entries, err = _parse_licbyl_xml(raw)
+    if err:
+        return [], err
+
+    if related_law_names:
+        wanted = {_norm_law_name(n) for n in related_law_names if n}
+        entries = [
+            e for e in entries if _norm_law_name(e["관련법령명"]) in wanted
+        ]
+    return entries, None
+
+
+def build_law_index(
+    law_folder: str,
+    fetch_byeolpyo: bool = False,
+    use_cache: bool = True,
+) -> dict:
     """
     Build the delegation cross-reference index for ONE law folder.
 
     Args:
         law_folder: folder name under the legalize-kr corpus, e.g.
                     "개인정보보호법" (spaces tolerated; NFC-folded).
+        fetch_byeolpyo: query law.go.kr licbyl for the 별표 catalogue.
+        use_cache: reuse a cached licbyl response if present (default True).
 
     Returns:
         A JSON-serializable dict — the sidecar index for this law.
@@ -359,10 +507,12 @@ def build_law_index(law_folder: str, fetch_byeolpyo: bool = False) -> dict:
     primary_articles, primary_meta = _index_file(primary_md, is_primary=True)
     decree_articles: list[IndexedArticle] = []
     rule_articles: list[IndexedArticle] = []
+    decree_meta: dict = {}
+    rule_meta: dict = {}
     if decree_md.exists():
-        decree_articles, _ = _index_file(decree_md, is_primary=False)
+        decree_articles, decree_meta = _index_file(decree_md, is_primary=False)
     if rule_md.exists():
-        rule_articles, _ = _index_file(rule_md, is_primary=False)
+        rule_articles, rule_meta = _index_file(rule_md, is_primary=False)
 
     primary_by_canon = _canonical_to_articles(primary_articles)
     decree_by_canon = _canonical_to_articles(decree_articles)
@@ -452,7 +602,18 @@ def build_law_index(law_folder: str, fetch_byeolpyo: bool = False) -> dict:
     byeolpyo_error: str | None = "별표 조회 안 함 (--byeolpyo 미지정)"
     if fetch_byeolpyo:
         law_display = primary_meta.get("제목", law_dir.name)
-        byeolpyo_catalogue, byeolpyo_error = fetch_byeolpyo_catalogue(law_display)
+        # restrict the licbyl result to this law's own 법률/시행령/시행규칙 —
+        # search=2 returns 별표 from every law whose name matches the query.
+        related = [
+            primary_meta.get("제목", ""),
+            decree_meta.get("제목", ""),
+            rule_meta.get("제목", ""),
+        ]
+        byeolpyo_catalogue, byeolpyo_error = fetch_byeolpyo_catalogue(
+            law_display,
+            related_law_names=[r for r in related if r],
+            use_cache=use_cache,
+        )
 
     index = {
         "schema": "kolaw-crossref/v1",
@@ -476,10 +637,10 @@ def build_law_index(law_folder: str, fetch_byeolpyo: bool = False) -> dict:
             "law_articles_delegating_ministerial": sum(
                 1 for a in primary_articles if a.delegates_ministerial
             ),
-            "law_byeolpyo_refs": sorted(
+            "law_byeolpyo_refs": _sorted_byeolpyo(
                 {n for a in primary_articles for n in a.byeolpyo_refs}
             ),
-            "decree_byeolpyo_refs": sorted(
+            "decree_byeolpyo_refs": _sorted_byeolpyo(
                 {n for nums in decree_byeolpyo.values() for n in nums}
             ),
         },
@@ -524,9 +685,18 @@ def main() -> int:
         action="store_true",
         help="law.go.kr licbyl 에서 별표 목록 best-effort 수집 (네트워크 필요)",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="licbyl 사이드카 캐시를 무시하고 항상 새로 호출",
+    )
     args = parser.parse_args()
 
-    index = build_law_index(args.law_folder, fetch_byeolpyo=args.byeolpyo)
+    index = build_law_index(
+        args.law_folder,
+        fetch_byeolpyo=args.byeolpyo,
+        use_cache=not args.no_cache,
+    )
 
     out_path = args.out
     if out_path is None:
@@ -550,7 +720,8 @@ def main() -> int:
     if cat:
         print(f"  별표 목록 (law.go.kr licbyl): {len(cat)}건")
         for b in cat:
-            print(f"    [{b['별표번호']}] {b['별표명']} "
+            tok = b.get("별표") or f"코드 {b['별표번호']}"
+            print(f"    [{b['별표종류']} {tok}] {b['별표명']} "
                   f"→ {b['attached_article'] or '(조문 미파싱)'} ({b['관련법령명']})")
     elif index["byeolpyo_error"]:
         print(f"  별표 목록: {index['byeolpyo_error']}")
