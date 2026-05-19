@@ -191,6 +191,64 @@ async def article(
         except Exception:  # crossref lookup must never break /article
             delegation_chain = None
 
+    # citation chunk 3: 이 조문의 가로 인용 관계 (다른 법령과의 인용).
+    citation_links = None
+    if result.found:
+        try:
+            from pathlib import Path as _Path
+            import unicodedata as _ud
+
+            from apps.api.schemas import CitationEdge, CitationLinks
+            from services.crossref import citation_db
+
+            # /article 의 source_path 끝이 <코퍼스>/<법령폴더>/<종류>.md —
+            # 그 폴더명이 citation_db 의 law_folder 키다.
+            law_folder = _ud.normalize(
+                "NFC", _Path(result.source_path).parent.name
+            )
+            if law_folder:
+                conn = citation_db.connect()
+                try:
+                    ob = citation_db.outbound(conn, law_folder, result.article)
+                    ib = citation_db.inbound(conn, law_folder, result.article)
+                finally:
+                    conn.close()
+                citation_links = CitationLinks(
+                    outbound=[
+                        CitationEdge(
+                            law_name=e["target_law_raw"],
+                            law_folder=e["target_law_folder"],
+                            article=e["target_article"],
+                            # file_type 은 DB 에 NFD(분해형)로 저장돼 있다 — 응답은
+                            # NFC 로 정규화해 클라이언트가 'law_folder'와 일관된
+                            # 합성형 한글을 받게 한다.
+                            file_type=_ud.normalize(
+                                "NFC", e["target_file_type"] or ""
+                            ),
+                            resolved=bool(e["target_resolved"]),
+                            strength=e["strength"],
+                            count=e["cnt"],
+                        )
+                        for e in ob
+                    ],
+                    inbound=[
+                        CitationEdge(
+                            law_name=e["src_law_name"],
+                            law_folder=e["src_law_folder"],
+                            article=e["src_article"],
+                            file_type=_ud.normalize(
+                                "NFC", e["src_file_type"] or ""
+                            ),
+                            resolved=True,
+                            strength=e["strength"],
+                            count=e["cnt"],
+                        )
+                        for e in ib
+                    ],
+                )
+        except Exception:  # citation lookup must never break /article
+            citation_links = None
+
     return ArticleResponse(
         found=result.found,
         law_name=result.law_name,
@@ -203,6 +261,7 @@ async def article(
         source_path=result.source_path,
         provenance="legalize-kr-file",
         delegation_chain=delegation_chain,
+        citation_links=citation_links,
         error=result.error,
     )
 

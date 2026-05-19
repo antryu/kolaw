@@ -66,6 +66,60 @@ class DelegationChain(BaseModel):
     )
 
 
+class CitationEdge(BaseModel):
+    """
+    법령 간 가로 인용 간선 한 건 — 인용 그래프의 '상대편' 조문 (citation chunk 3).
+
+    outbound 에서 상대편 = 인용 대상(이 조문이 인용하는 법·조문),
+    inbound 에서 상대편 = 인용 주체(이 조문을 인용하는 법·조문).
+    services/crossref/citation_graph.db 의 한 간선을 옮긴 구조.
+    """
+
+    law_name: str = Field("", description="상대편 법령명")
+    law_folder: str | None = Field(
+        None,
+        description=(
+            "상대편 법령의 코퍼스 폴더명 — 법률도서관에 없는 법(미보유)이면 None."
+        ),
+    )
+    article: str | None = Field(
+        None, description="상대편 조문 — 법 전체 인용이면 None."
+    )
+    file_type: str = Field(
+        "", description="상대편 법령 종류 — 법률 / 시행령 / 대통령령 등."
+    )
+    resolved: bool = Field(
+        True,
+        description=(
+            "상대편 법령이 법률도서관에 있으면 true. false 면 미보유 — "
+            "본문 조회는 불가, 인용 사실(법령명·조문)만 보존된 간선."
+        ),
+    )
+    strength: Literal["strong", "weak"] = Field(
+        "weak", description="strong=준용('준용한다'), weak=단순 참조."
+    )
+    count: int = Field(1, description="이 인용이 출발 조문 본문에 나타난 횟수.")
+
+
+class CitationLinks(BaseModel):
+    """
+    이 조문의 법령 간 가로 인용 관계 (citation chunk 3).
+
+    위임(delegation_chain)이 세로 관계(본법↔시행령↔시행규칙)라면, 이건 가로 —
+    다른 법령과의 인용 관계다. services/crossref/citation_graph.db 색인 기반.
+    outbound·inbound 모두 비어 있을 수 있다(인용도 피인용도 없는 조문).
+    """
+
+    outbound: list[CitationEdge] = Field(
+        default_factory=list,
+        description="이 조문이 인용하는 다른 법·조문. 준용(strong)이 먼저 정렬됨.",
+    )
+    inbound: list[CitationEdge] = Field(
+        default_factory=list,
+        description="이 조문을 인용하는 다른 법·조문 (역방향).",
+    )
+
+
 class Citation(BaseModel):
     law_id: str = Field(..., description="법령일련번호, e.g. '013670'")
     law_name: str = Field(..., description="법령명, e.g. '수소경제 육성 및 수소 안전관리에 관한 법률'")
@@ -171,6 +225,14 @@ class ArticleResponse(BaseModel):
         description=(
             "이 조문이 속한 위임 체인 (Phase 2). 본법↔시행령↔시행규칙↔별표 위임 "
             "관계가 crossref 색인에 있으면 부착, 없으면 None."
+        ),
+    )
+    citation_links: CitationLinks | None = Field(
+        None,
+        description=(
+            "이 조문의 법령 간 가로 인용 관계 (citation chunk 3). 인용 그래프 "
+            "색인에서 outbound(인용하는 법)·inbound(인용받는 법)를 부착, 색인이 "
+            "없거나 조회 실패면 None — 기존 동작과 동일하게 무시하면 된다."
         ),
     )
     error: str | None = Field(
