@@ -120,6 +120,8 @@ _BYEOLPYO_ATTACH_RE = re.compile(r"제(\d+)조(?:의(\d+))?")
 # law.go.kr DRF API — licbyl(별표서식) catalogue search.
 _DRF_OC = "Hydrogen"
 _DRF_LICBYL_SEARCH = "https://www.law.go.kr/DRF/lawSearch.do"
+# law.go.kr origin — licbyl attachment links are root-relative; prefix this.
+_LAW_GO_KR = "https://www.law.go.kr"
 # Polite delay (seconds) between consecutive licbyl HTTP calls — keeps the
 # full 2,302-law expansion under law.go.kr's rate limit.
 _LICBYL_SLEEP = 0.7
@@ -376,6 +378,14 @@ def _parse_licbyl_xml(raw: str) -> tuple[list[dict], str | None]:
             base, eui = m.group(1), m.group(2)
             attached = f"제{base}조" if not eui else f"제{base}조의{eui}"
         raw_no = g("별표번호")
+        # Attachment download links — licbyl gives them root-relative
+        # ("/LSW/flDownload.do?flSeq=..."); promote to absolute URLs so the
+        # 별표 body extractor (services.crossref.byeolpyo_body) can fetch
+        # them without re-deriving the host. PDF is born-digital (vector
+        # text) and is the primary extraction source; HWP is kept as a
+        # fallback handle only.
+        pdf_link = g("별표서식PDF파일링크")
+        hwp_link = g("별표서식파일링크")
         entries.append({
             "별표번호": raw_no,
             # canonical token decoded from the 6-digit code — lines up with
@@ -387,6 +397,8 @@ def _parse_licbyl_xml(raw: str) -> tuple[list[dict], str | None]:
             "관련법령ID": g("관련법령ID"),
             "별표일련번호": g("별표일련번호"),
             "attached_article": attached,
+            "pdf_url": _LAW_GO_KR + pdf_link if pdf_link else "",
+            "hwp_url": _LAW_GO_KR + hwp_link if hwp_link else "",
         })
     return entries, None
 
