@@ -666,48 +666,32 @@ def build_law_index(
     return index
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Build delegation cross-reference index for one law folder."
-    )
-    parser.add_argument(
-        "law_folder",
-        help="법령 폴더명 (legalize-kr corpus), e.g. 개인정보보호법",
-    )
-    parser.add_argument(
-        "-o", "--out",
-        type=Path,
-        default=None,
-        help="출력 JSON 경로 (기본: services/crossref/index/<folder>.json)",
-    )
-    parser.add_argument(
-        "--byeolpyo",
-        action="store_true",
-        help="law.go.kr licbyl 에서 별표 목록 best-effort 수집 (네트워크 필요)",
-    )
-    parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="licbyl 사이드카 캐시를 무시하고 항상 새로 호출",
-    )
-    args = parser.parse_args()
+def _index_dir() -> Path:
+    """Default output directory for sidecar index JSON files."""
+    return Path(__file__).resolve().parent / "index"
 
+
+def _build_one_law(
+    law_folder: str,
+    fetch_byeolpyo: bool,
+    use_cache: bool,
+    out_path: Path,
+) -> dict:
+    """Build the index for one law folder and write it to ``out_path``."""
     index = build_law_index(
-        args.law_folder,
-        fetch_byeolpyo=args.byeolpyo,
-        use_cache=not args.no_cache,
+        law_folder,
+        fetch_byeolpyo=fetch_byeolpyo,
+        use_cache=use_cache,
     )
-
-    out_path = args.out
-    if out_path is None:
-        out_dir = Path(__file__).resolve().parent / "index"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{index['law_folder']}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    return index
 
+
+def _print_law_summary(index: dict, out_path: Path) -> None:
+    """Print the per-law summary block (single-law mode)."""
     c = index["counts"]
     print(f"[crossref] {index['law_name']} ({index['law_folder']})")
     print(f"  법률 {c['law_articles']}조 / 시행령 {c['decree_articles']}조 "
@@ -726,6 +710,191 @@ def main() -> int:
     elif index["byeolpyo_error"]:
         print(f"  별표 목록: {index['byeolpyo_error']}")
     print(f"  -> {out_path}")
+
+
+def run_all(
+    fetch_byeolpyo: bool = False,
+    use_cache: bool = True,
+    force: bool = False,
+    limit: int | None = None,
+    progress_every: int = 50,
+) -> int:
+    """
+    Batch mode: build the delegation index for every law folder in the corpus.
+
+    Walks ``_CORPUS_PATH`` (legalize-kr ``kr/``) in sorted folder order. For
+    each folder:
+      - if ``index/<folder>.json`` already exists and ``force`` is False, skip
+        it (resume-safe — a re-run picks up where it left off);
+      - otherwise build the index and write the sidecar JSON.
+
+    Per-law try/except isolation: one law failing never aborts the run; the
+    failure is collected and the loop moves on. Folders that have no 법률.md
+    (decree-only / rule-only entities — there is no primary law to delegate
+    FROM) are counted separately as "skipped (no primary law)", NOT as errors.
+
+    ``progress_every`` controls how often a ``[진행] N/TOTAL`` line is written
+    to stderr. ``limit`` caps the number of folders processed (slice mode for
+    validation). licbyl responses are cached per law, so ``--byeolpyo`` over
+    the full corpus stays within law.go.kr's rate limit and re-runs reuse the
+    cache.
+
+    Returns a process exit code: 0 if every processed law succeeded or was a
+    clean skip, 1 if at least one law raised an unexpected error.
+    """
+    if not _CORPUS_PATH.is_dir():
+        print(f"[crossref] 코퍼스 경로 없음: {_CORPUS_PATH}", file=sys.stderr)
+        return 1
+
+    folders = sorted(
+        (e for e in _CORPUS_PATH.iterdir() if e.is_dir()),
+        key=lambda p: p.name,
+    )
+    if limit is not None:
+        folders = folders[:limit]
+    total = len(folders)
+    out_dir = _index_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"[crossref] --all 배치 시작 — 대상 {total}개 폴더 "
+          f"(force={force}, byeolpyo={fetch_byeolpyo})", file=sys.stderr)
+
+    built = 0            # newly built this run
+    resumed = 0          # skipped because index JSON already present
+    no_primary = 0       # skipped — folder has no 법률.md (decree-only entity)
+    failed: list[tuple[str, str]] = []   # (folder, error message)
+    total_chains = 0
+    total_byeolpyo = 0
+
+    for i, folder in enumerate(folders, start=1):
+        if i % progress_every == 0 or i == total:
+            print(f"[진행] {i}/{total} ... (생성 {built} / 스킵 {resumed} "
+                  f"/ 본법없음 {no_primary} / 실패 {len(failed)})",
+                  file=sys.stderr)
+
+        out_path = out_dir / f"{folder.name}.json"
+        if out_path.exists() and not force:
+            resumed += 1
+            continue
+
+        try:
+            index = _build_one_law(
+                folder.name, fetch_byeolpyo, use_cache, out_path
+            )
+        except FileNotFoundError as exc:
+            # No 법률.md — decree-only / rule-only entity. Expected for ~1,000
+            # corpus folders; it is a clean skip, not a failure.
+            if "법률.md 없음" in str(exc):
+                no_primary += 1
+            else:
+                failed.append((folder.name, f"{type(exc).__name__}: {exc}"))
+            continue
+        except Exception as exc:  # noqa: BLE001 — isolate any per-law fault
+            failed.append((folder.name, f"{type(exc).__name__}: {exc}"))
+            continue
+
+        built += 1
+        total_chains += index["counts"]["delegation_chains"]
+        total_byeolpyo += len(index["byeolpyo_catalogue"])
+
+    print(file=sys.stderr)
+    print("[crossref] --all 배치 완료", file=sys.stderr)
+    print(f"  대상 폴더        {total}", file=sys.stderr)
+    print(f"  신규 생성        {built}", file=sys.stderr)
+    print(f"  재실행 스킵      {resumed} (index JSON 이미 존재)", file=sys.stderr)
+    print(f"  본법 없음 스킵   {no_primary} (시행령·규칙 단독 폴더)", file=sys.stderr)
+    print(f"  실패            {len(failed)}", file=sys.stderr)
+    print(f"  총 위임 체인     {total_chains} (이번 실행 신규 생성분)",
+          file=sys.stderr)
+    print(f"  총 별표 카탈로그 {total_byeolpyo} (이번 실행 신규 생성분)",
+          file=sys.stderr)
+    if failed:
+        print("  실패 목록:", file=sys.stderr)
+        for name, err in failed:
+            print(f"    - {name}: {err}", file=sys.stderr)
+
+    return 1 if failed else 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Build delegation cross-reference index for law folders."
+    )
+    parser.add_argument(
+        "law_folder",
+        nargs="?",
+        default=None,
+        help="법령 폴더명 (legalize-kr corpus), e.g. 개인정보보호법. "
+             "--all 지정 시 생략.",
+    )
+    parser.add_argument(
+        "-o", "--out",
+        type=Path,
+        default=None,
+        help="출력 JSON 경로 (기본: services/crossref/index/<folder>.json). "
+             "단일 법령 모드에서만 유효.",
+    )
+    parser.add_argument(
+        "--byeolpyo",
+        action="store_true",
+        help="law.go.kr licbyl 에서 별표 목록 best-effort 수집 (네트워크 필요)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="licbyl 사이드카 캐시를 무시하고 항상 새로 호출",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="코퍼스 전체 법령 폴더를 일괄 색인 (배치 모드)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="--all 배치에서 이미 있는 index JSON 도 다시 생성",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="--all 배치에서 처리할 폴더 수 상한 (정렬 후 앞 N개 — 검증용 슬라이스)",
+    )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=50,
+        help="--all 배치 진행 로그 출력 간격 (기본 50개마다)",
+    )
+    args = parser.parse_args()
+
+    if args.all:
+        return run_all(
+            fetch_byeolpyo=args.byeolpyo,
+            use_cache=not args.no_cache,
+            force=args.force,
+            limit=args.limit,
+            progress_every=max(1, args.progress_every),
+        )
+
+    if not args.law_folder:
+        parser.error("law_folder 를 지정하거나 --all 을 사용하세요.")
+
+    index = build_law_index(
+        args.law_folder,
+        fetch_byeolpyo=args.byeolpyo,
+        use_cache=not args.no_cache,
+    )
+    out_path = args.out
+    if out_path is None:
+        # use the RESOLVED folder name (NFC fold / space tolerance) so the
+        # default output path is stable regardless of how the arg was typed.
+        out_path = _index_dir() / f"{index['law_folder']}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    _print_law_summary(index, out_path)
     return 0
 
 
