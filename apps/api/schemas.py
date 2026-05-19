@@ -49,6 +49,14 @@ class DelegationChain(BaseModel):
         default_factory=list,
         description="위임된 시행규칙 조문들 — 각 항목 {doc_id, article, title, file_type}.",
     )
+    tree_text: str = Field(
+        "",
+        description=(
+            "위임 체인을 들여쓰기 계층으로 렌더한 순수 텍스트 트리 (Phase 3). "
+            "본법→시행령→시행규칙→별표 구조를 한눈에 보여주며, hit 된 조문은 "
+            "'▶' 마커로 표시. 평평한 링크 목록 대신 이 텍스트를 그대로 출력하면 된다."
+        ),
+    )
 
 
 class Citation(BaseModel):

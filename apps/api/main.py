@@ -165,6 +165,10 @@ async def article(
         try:
             from apps.api.schemas import DelegationChain
             from services.crossref.lookup import get_delegation_chain_by_article
+            from services.crossref.tree_render import (
+                render_delegation_tree,
+                resolve_hit_doc_id,
+            )
 
             chain_dict = get_delegation_chain_by_article(
                 law_id=result.law_id,
@@ -172,7 +176,18 @@ async def article(
                 article=result.article,
             )
             if chain_dict is not None:
-                delegation_chain = DelegationChain(**chain_dict)
+                # Phase 3: render the chain as an indented tree. /article holds
+                # a (file_type, article) ref — resolve it to the hit doc_id so
+                # the requested 조문 is marked with ▶.
+                hit_doc_id = resolve_hit_doc_id(
+                    chain_dict, result.type, result.article
+                )
+                tree_text = render_delegation_tree(
+                    chain_dict, hit_doc_id=hit_doc_id
+                )
+                delegation_chain = DelegationChain(
+                    **chain_dict, tree_text=tree_text
+                )
         except Exception:  # crossref lookup must never break /article
             delegation_chain = None
 

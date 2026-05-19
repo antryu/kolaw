@@ -503,10 +503,16 @@ def _meta_to_citation(doc: str, meta: dict, score: float, doc_id: str | None = N
     if doc_id:
         try:
             from services.crossref.lookup import get_delegation_chain
+            from services.crossref.tree_render import render_delegation_tree
 
             chain_dict = get_delegation_chain(doc_id)
             if chain_dict is not None:
-                delegation_chain = DelegationChain(**chain_dict)
+                # Phase 3: render the chain as an indented tree, marking the
+                # hit article (this doc_id) with ▶.
+                tree_text = render_delegation_tree(chain_dict, hit_doc_id=doc_id)
+                delegation_chain = DelegationChain(
+                    **chain_dict, tree_text=tree_text
+                )
         except Exception as exc:  # crossref lookup must never break search
             logger.warning("delegation_chain lookup failed for %s: %s", doc_id, exc)
 
