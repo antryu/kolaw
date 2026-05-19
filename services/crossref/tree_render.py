@@ -17,6 +17,9 @@ Phase 2 의 ``DelegationChain`` (본법 조문 → 시행령/시행규칙 조문
 * hit 마커: 검색·조회로 직접 hit 된 조문은 ``▶`` 로 표시한다. 호출자가
   hit 된 조문의 doc_id 를 ``hit_doc_id`` 로 넘기면 그 줄 앞에 마커가 붙는다.
   미지정이면 마커 없음(회귀 없음).
+* 별표 줄: 별표 본문(Phase 3 A안)이 체인에 붙어 있으면 ``(본문 있음)`` /
+  ``(이미지형, 본문 없음)`` 만 표시한다 — 본문 텍스트·표는 트리에 도배하지
+  않고 체인 dict 의 ``byeolpyo[].bodies`` 구조화 필드에 둔다(가독성 유지).
 """
 
 from __future__ import annotations
@@ -170,11 +173,30 @@ def render_delegation_tree(
             f"{r_ftype} {r_label}"
         )
 
-    # --- 별표 (doc_id 없음 — 코퍼스 미수록, catalogue 참조만) ----------------
+    # --- 별표 (doc_id 없음 — 코퍼스 미수록) ---------------------------------
+    # Phase 3 A안: byeolpyo 항목은 enrich 된 dict
+    # ({별표, body_available, bodies}) 또는 (미enrich 시) 별표 번호 문자열.
+    # 트리 가독성을 위해 본문 자체는 싣지 않고 가용 여부만 표시한다 —
+    # 실제 본문(text·tables)은 체인 dict 의 byeolpyo[].bodies 에 있다.
     for bp in chain.get("byeolpyo", []) or []:
-        bp_label = str(bp).strip()
-        if not bp_label:
-            continue
-        lines.append(f"{_prefix(None)}{_INDENT}{_BRANCH}참조→ 별표 {bp_label}")
+        if isinstance(bp, dict):
+            bp_label = str(bp.get("별표", "")).strip()
+            if not bp_label:
+                continue
+            bodies = bp.get("bodies", []) or []
+            if bp.get("body_available"):
+                avail = " (본문 있음)"
+            elif bodies and all(b.get("is_image") for b in bodies):
+                avail = " (이미지형, 본문 없음)"
+            else:
+                avail = ""
+        else:
+            bp_label = str(bp).strip()
+            if not bp_label:
+                continue
+            avail = ""
+        lines.append(
+            f"{_prefix(None)}{_INDENT}{_BRANCH}참조→ 별표 {bp_label}{avail}"
+        )
 
     return "\n".join(lines)

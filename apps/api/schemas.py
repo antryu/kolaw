@@ -39,7 +39,14 @@ class DelegationChain(BaseModel):
     )
     byeolpyo: list[Any] = Field(
         default_factory=list,
-        description="연결된 별표 — 색인 JSON 의 별표 참조 형식 그대로.",
+        description=(
+            "연결된 별표 — Phase 3 A안 enrich 형식. 각 항목 "
+            "{별표: 번호, body_available: bool, bodies: [{별표명, 관련법령명, "
+            "별표일련번호, is_image, body_available, text, tables:[{page, "
+            "markdown}], pdf_url, ...}]}. bodies 는 1:N (같은 번호가 시행령· "
+            "시행규칙으로 갈릴 수 있음). is_image=true 별표는 본문 대신 "
+            "image 플래그만. 본문 사이드카가 없으면 bodies 빈 리스트."
+        ),
     )
     decree_articles: list[dict] = Field(
         default_factory=list,

@@ -20,7 +20,9 @@ Design notes
   nested under a 시행령 article. The index maps each of those doc_ids to the
   same chain object, so a hit on a 시행령 조문 surfaces its 본법 parent too.
 * 별표 carry no doc_id (별표 본문이 코퍼스에 없음 — law.go.kr catalogue only),
-  so they are exposed only as the ``byeolpyo`` field already on the chain.
+  but Phase-3 A안 마지막 청크에서 ``byeolpyo_lookup`` 이 별표 본문(표·텍스트)을
+  ``byeolpyo`` 필드에 붙인다 — 각 항목이 ``{별표, body_available, bodies:[...]}``
+  형태가 된다. 본문 사이드카가 없으면 ``bodies`` 빈 리스트(회귀 없음).
 """
 
 from __future__ import annotations
@@ -29,6 +31,8 @@ import json
 import logging
 import threading
 from pathlib import Path
+
+from services.crossref.byeolpyo_lookup import enrich_byeolpyo_refs
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +113,10 @@ def _normalize_chain(chain: dict, law_name: str, law_id: str) -> dict:
     ingest scheme (see `_chromadb_doc_id`) so a search/article hit's doc_id
     matches, and so `render_delegation_tree`'s ▶ hit marker compares against
     the same scheme the caller passes in.
+
+    The `byeolpyo` field — bare 별표 numbers in the sidecar — is enriched by
+    `byeolpyo_lookup.enrich_byeolpyo_refs` into `{별표, body_available,
+    bodies:[...]}` dicts so a caller sees the 별표 본문(표·텍스트) inline.
     """
     return {
         "law_name": law_name,
@@ -119,7 +127,7 @@ def _normalize_chain(chain: dict, law_name: str, law_id: str) -> dict:
         ),
         "law_title": chain.get("law_title", ""),
         "delegation_kind": chain.get("delegation_kind", []),
-        "byeolpyo": chain.get("byeolpyo", []),
+        "byeolpyo": enrich_byeolpyo_refs(law_name, chain.get("byeolpyo", [])),
         "decree_articles": [
             _retag_article_doc_id(d, "시행령")
             for d in (chain.get("decree_articles", []) or [])
