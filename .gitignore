@@ -10,3 +10,8 @@ dist/
 chroma_data/
 chroma_db/
 *.db
+
+# kolaw crossref — generated index/cache artifacts (regenerate: build_index.py --all)
+services/crossref/index/
+services/crossref/cache/
+services/crossref/__pycache__/
