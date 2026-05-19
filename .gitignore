@@ -16,3 +16,4 @@ services/crossref/index/
 services/crossref/cache/
 services/crossref/__pycache__/
 services/crossref/byeolpyo_bodies/
+services/crossref/citations/
