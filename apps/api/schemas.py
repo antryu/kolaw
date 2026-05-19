@@ -6,9 +6,49 @@ Structured citations with trajectory audit support for Counsely Track C.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+class DelegationChain(BaseModel):
+    """
+    위임 체인 — 본법 조문이 시행령·시행규칙·별표로 위임한 관계 (Phase 2).
+
+    services/crossref/index/<법령>.json 의 한 delegation_chain 을 그대로 옮긴
+    구조. 검색·조문 조회 결과(Citation/ArticleResponse)에 부착되어, hit 된
+    조문이 위임 체인의 어디에 있고 위·아래로 무엇이 연결되는지 보여준다.
+
+    decree_articles / rule_articles / byeolpyo 는 색인 JSON 형식(각 항목이
+    doc_id·article·title 등을 담은 dict)을 그대로 노출 — 별표·하위규칙 구조
+    변동에 견디도록 느슨하게 둔다.
+    """
+
+    law_name: str = Field(..., description="이 체인이 속한 법령명, e.g. '개인정보 보호법'")
+    law_id: str = Field("", description="법령ID, e.g. '011357'")
+    law_article: str = Field(
+        ..., description="위임의 출발점인 본법 조문(정규화), e.g. '제28조의8'"
+    )
+    law_doc_id: str = Field(
+        "", description="본법 조문의 ChromaDB doc_id, e.g. '011357_개인정보보호법_법률_제28조_8'"
+    )
+    law_title: str = Field("", description="본법 조문 제목, e.g. '(개인정보의 국외 이전)'")
+    delegation_kind: list[str] = Field(
+        default_factory=list,
+        description="위임 종류 — '대통령령' / '총리령·부령' 등",
+    )
+    byeolpyo: list[Any] = Field(
+        default_factory=list,
+        description="연결된 별표 — 색인 JSON 의 별표 참조 형식 그대로.",
+    )
+    decree_articles: list[dict] = Field(
+        default_factory=list,
+        description="위임된 시행령 조문들 — 각 항목 {doc_id, article, title, file_type}.",
+    )
+    rule_articles: list[dict] = Field(
+        default_factory=list,
+        description="위임된 시행규칙 조문들 — 각 항목 {doc_id, article, title, file_type}.",
+    )
 
 
 class Citation(BaseModel):
@@ -29,6 +69,14 @@ class Citation(BaseModel):
         description=(
             "해당 법령의 시행일/확인일 YYYYMMDD — version(시행일자)을 그대로 사용. "
             "한국법은 시행령·고시가 자주 바뀌어 시행일 명시가 중요. 미상 시 빈 문자열."
+        ),
+    )
+    delegation_chain: DelegationChain | None = Field(
+        None,
+        description=(
+            "이 조문이 속한 위임 체인 (Phase 2). 본법↔시행령↔시행규칙↔별표 위임 "
+            "관계가 crossref 색인에 있으면 부착, 없으면 None. None 이면 위임 관계가 "
+            "색인되지 않은 조문 — 기존 동작과 동일하게 무시하면 된다."
         ),
     )
 
@@ -102,6 +150,13 @@ class ArticleResponse(BaseModel):
     provenance: str = Field(
         "legalize-kr-file",
         description="수집 경위 — /article 은 항상 legalize-kr 파일 직접 파싱.",
+    )
+    delegation_chain: DelegationChain | None = Field(
+        None,
+        description=(
+            "이 조문이 속한 위임 체인 (Phase 2). 본법↔시행령↔시행규칙↔별표 위임 "
+            "관계가 crossref 색인에 있으면 부착, 없으면 None."
+        ),
     )
     error: str | None = Field(
         None, description="조문/법령 미발견 시 사람이 읽을 수 있는 사유."

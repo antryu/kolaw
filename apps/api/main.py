@@ -158,6 +158,24 @@ async def article(
     result = lookup_article(law_name=law, article_ref=article, law_type=type)
     if not result.found:
         response.status_code = 404
+
+    # Phase 2: attach the delegation chain this article belongs to, if indexed.
+    delegation_chain = None
+    if result.found:
+        try:
+            from apps.api.schemas import DelegationChain
+            from services.crossref.lookup import get_delegation_chain_by_article
+
+            chain_dict = get_delegation_chain_by_article(
+                law_id=result.law_id,
+                file_type=result.type,
+                article=result.article,
+            )
+            if chain_dict is not None:
+                delegation_chain = DelegationChain(**chain_dict)
+        except Exception:  # crossref lookup must never break /article
+            delegation_chain = None
+
     return ArticleResponse(
         found=result.found,
         law_name=result.law_name,
@@ -169,6 +187,7 @@ async def article(
         type=result.type,
         source_path=result.source_path,
         provenance="legalize-kr-file",
+        delegation_chain=delegation_chain,
         error=result.error,
     )
 

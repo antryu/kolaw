@@ -19,7 +19,7 @@ import re
 import time
 from collections import OrderedDict
 
-from apps.api.schemas import Citation, SearchRequest, SearchResponse
+from apps.api.schemas import Citation, DelegationChain, SearchRequest, SearchResponse
 from services.fast_search.ingest import (
     _COLLECTION_NAME,
     get_chroma_client,
@@ -477,8 +477,15 @@ async def _llm_rerank(
     return rerank_candidates[:top_k]
 
 
-def _meta_to_citation(doc: str, meta: dict, score: float) -> Citation:
-    """Convert a retrieval result to a Citation."""
+def _meta_to_citation(doc: str, meta: dict, score: float, doc_id: str | None = None) -> Citation:
+    """
+    Convert a retrieval result to a Citation.
+
+    `doc_id` is the ChromaDB id of the hit chunk. When supplied, the crossref
+    lookup attaches the article's 위임 체인 (delegation_chain) — None when the
+    article is not part of an indexed chain, so the field is simply omitted
+    and pre-Phase-2 callers see no behaviour change.
+    """
     law_id = meta.get("law_id", "unknown")
     law_name = meta.get("law_name", "")
     article_number = meta.get("article") or meta.get("article_number", "")
@@ -490,6 +497,19 @@ def _meta_to_citation(doc: str, meta: dict, score: float) -> Citation:
     excerpt = doc[:400].replace("\n", " ") if doc else ""
 
     version = enforcement_date.replace("-", "") if enforcement_date else ""
+
+    # Phase 2: attach the delegation chain this article belongs to, if indexed.
+    delegation_chain: DelegationChain | None = None
+    if doc_id:
+        try:
+            from services.crossref.lookup import get_delegation_chain
+
+            chain_dict = get_delegation_chain(doc_id)
+            if chain_dict is not None:
+                delegation_chain = DelegationChain(**chain_dict)
+        except Exception as exc:  # crossref lookup must never break search
+            logger.warning("delegation_chain lookup failed for %s: %s", doc_id, exc)
+
     return Citation(
         law_id=law_id,
         law_name=law_name,
@@ -500,6 +520,7 @@ def _meta_to_citation(doc: str, meta: dict, score: float) -> Citation:
         provenance="kolaw-index",
         # verified_date: 시행일자(version)를 확인일로 사용
         verified_date=version,
+        delegation_chain=delegation_chain,
     )
 
 
@@ -688,8 +709,8 @@ async def fast_search(req: SearchRequest) -> SearchResponse:
             )
 
     citations = [
-        _meta_to_citation(doc, meta, score)
-        for _, meta, doc, score in reranked[:_TOP_K]
+        _meta_to_citation(doc, meta, score, doc_id=doc_id)
+        for doc_id, meta, doc, score in reranked[:_TOP_K]
     ]
 
     # Confidence from best RRF score (normalised: typical max RRF ~0.016 for rank 1 of 2 lists)
